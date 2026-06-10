@@ -97,5 +97,11 @@ mode with seeded synthetic data), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_
 Read this file **and [LESSONS.md](LESSONS.md)** before starting any task, and append a
 LESSONS.md entry after finishing one. Plan before writing code and get the plan approved
 (plan mode). Verify UI changes with Playwright MCP before/after screenshots at **1440px and
-390px** widths (store in `tests/visual/`). Small reviewable commits; one feature = one
-branch = one PR. Never weaken or delete tests to make things pass. Ask when ambiguous.
+390px** widths (store in `tests/visual/`). Never weaken or delete tests to make things
+pass. Ask when ambiguous.
+
+**Trunk-based, no PRs** (owner's preference, 2026-06-10): commit small reviewable commits
+directly on `main`. No feature branches, no pull requests, nothing for the owner to merge.
+When the owner says to ship/push live: `git push origin main` then `vercel deploy --prod`
+(CLI is linked to the `plus-plus-pipeline-scorecard` project). Deploy only on command —
+verified work can sit committed on `main` until then.

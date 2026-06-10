@@ -70,10 +70,12 @@ what to do next time. Read this file before starting any new task.
   `OpenDeals` export: debounced search, sortable headers, stage/value/age filter bar with
   removable pills, "Showing N of M" count, empty state, row→drawer), `Metric.tsx` (exported
   the previously-private `usePop` hook to reuse for the stage dropdown).
-- **Decisions**: the drawer's owner / last-activity / next-step fields don't exist on `Deal`
-  and the brief said don't touch the data layer — owner shows **"Not synced yet"** placeholders
-  (clean seam for a later associations/owners-API follow-up). Search matches deal name only
-  (no separate account field; the account is embedded in the name). Live portal has exactly
+- **Decisions** (owner confirmed, 2026-06-10): the data-layer / HubSpot guardrail is **hard**
+  and wins over completeness. The drawer's owner / last-activity / next-step fields don't exist
+  on `Deal`, so they render a graceful **"Not available"** placeholder — no fetching/plumbing
+  added (clean seam for a later associations/owners-API follow-up). Search matches deal name
+  only (no separate account field; the account is embedded in the name). Ordering is
+  search+filter+sort **then** the top-12 cap, default sort AGE desc. Live portal has exactly
   **52 open deals** and real "Robinhood …" records, so the search test hit real data.
 - **Surprises**: (1) Hit the documented `.rise` stacking-context trap again — the drawer was
   rendered *inside* the `.rise` `<Section>`, so its `z-50` was scoped within the section and

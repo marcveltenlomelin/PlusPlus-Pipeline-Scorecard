@@ -16,9 +16,9 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Fields not yet synced from HubSpot — rendered as a quiet placeholder. */
-function NotSynced() {
-  return <span className="italic text-ink-faint">Not synced yet</span>;
+/** Fields the data layer doesn't expose — rendered as a quiet placeholder. */
+function NotAvailable() {
+  return <span className="italic text-ink-faint">Not available</span>;
 }
 
 /**
@@ -94,7 +94,7 @@ export default function OpenDealDrawer({ deal, onClose }: { deal: Deal; onClose:
             )}
           </Row>
           <Row label="Owner">
-            <NotSynced />
+            <NotAvailable />
           </Row>
           <Row label="Created">
             <span className="font-mono text-ink-soft">{fmtDate(deal.createdAt)}</span>
@@ -103,10 +103,10 @@ export default function OpenDealDrawer({ deal, onClose }: { deal: Deal; onClose:
             <span className="font-mono text-ink-soft">{daysAgo(deal.createdAt, now)}</span>
           </Row>
           <Row label="Last activity">
-            <NotSynced />
+            <NotAvailable />
           </Row>
           <Row label="Next step">
-            <NotSynced />
+            <NotAvailable />
           </Row>
         </dl>
 

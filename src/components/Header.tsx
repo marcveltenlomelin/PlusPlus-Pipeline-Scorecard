@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import { fmtDateTime } from "@/lib/format";
 import { isCurrentPeriod, periodKey, periodLabel, shiftPeriod } from "@/lib/periods";
 import type { DealsPayload, Granularity } from "@/lib/types";
@@ -187,6 +188,13 @@ export default function Header(p: HeaderProps) {
             {p.refreshing ? "Syncing…" : "Refresh"}
           </button>
           <HowToRead />
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/signin" })}
+            className="border border-rule-dark px-3 py-2 text-xs font-bold uppercase tracking-wider text-ink-soft transition-colors hover:border-accent hover:text-accent"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     </header>

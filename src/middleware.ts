@@ -1,37 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 /**
- * Access gate. Inactive while DASHBOARD_PASSWORD is unset (local preview).
- * Set the env var and every request must carry the auth cookie issued by
- * /api/gate — drop-in protection before this ever reaches a shared URL.
+ * Access gate: every page and API route requires a session from Google
+ * sign-in, restricted to verified @plusplus.co accounts (see src/auth.ts).
  */
-
-async function expectedCookie(password: string): Promise<string> {
-  const data = new TextEncoder().encode(`pp-dash:${password}`);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-export async function middleware(req: NextRequest) {
-  const password = process.env.DASHBOARD_PASSWORD;
-  if (!password) return NextResponse.next();
-
+export default auth((req) => {
   const { pathname } = req.nextUrl;
-  if (pathname === "/gate" || pathname === "/api/gate") return NextResponse.next();
-
-  const cookie = req.cookies.get("pp_dash_auth")?.value;
-  if (cookie && cookie === (await expectedCookie(password))) return NextResponse.next();
+  if (pathname.startsWith("/api/auth") || pathname === "/signin") {
+    return NextResponse.next();
+  }
+  if (req.auth?.user) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const url = req.nextUrl.clone();
-  url.pathname = "/gate";
+  url.pathname = "/signin";
+  url.search = "";
   return NextResponse.redirect(url);
-}
+});
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|plusplus-logo.png).*)"],
 };

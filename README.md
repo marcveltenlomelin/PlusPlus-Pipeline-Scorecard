@@ -34,7 +34,8 @@ and never reaches the browser.
 | Var | Required | Purpose |
 |---|---|---|
 | `HUBSPOT_TOKEN` | for live data | Private App token, server-side only |
-| `DASHBOARD_PASSWORD` | before hosting | enables the access gate (see below) |
+| `AUTH_SECRET` | yes | Auth.js cookie-signing secret (`openssl rand -base64 32`) |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | yes | Google OAuth client for the sign-in gate (see below) |
 
 ## How the numbers are defined
 
@@ -79,10 +80,15 @@ audit trail for any skeptical reader.
 ## Access gate
 
 The dashboard renders the company's full pipeline, so it must never sit on a public URL
-ungated. The gate is built in and inactive only while `DASHBOARD_PASSWORD` is unset (local
-preview). Set the env var and every page/API request requires the password once per browser
-(SHA-256 cookie, httpOnly, 30-day expiry, timing-safe compare). For real hosting, this drops
-in as-is — or swap `src/middleware.ts` for your SSO of choice; it's the single choke point.
+ungated. Every page and API request requires a Google sign-in session, and sign-in only
+succeeds for **verified `@plusplus.co` Google Workspace accounts** — the `signIn` callback
+in `src/auth.ts` checks Google's `email_verified` and `hd` (hosted domain) token claims, so
+a personal Gmail with a spoofed address can never pass. `src/middleware.ts` is the single
+choke point; unauthenticated page loads redirect to `/signin`, API calls get a 401.
+
+Setup: create an OAuth client (Web application) in Google Cloud Console with redirect URI
+`https://<host>/api/auth/callback/google` (plus `http://localhost:3000/api/auth/callback/google`
+for dev) and set `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `AUTH_SECRET`.
 
 ## Decisions worth knowing
 

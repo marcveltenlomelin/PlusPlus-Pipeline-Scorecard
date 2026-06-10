@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ARR_TARGET,
   AVG_DEAL_SIZE,
@@ -290,6 +290,51 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
 
   const stagePop = usePop();
 
+  // Expand/collapse animates the table wrapper's height. `height: auto` isn't
+  // animatable, so: pin the current px height on click, let React render the
+  // new row set, then transition from the pinned height to the measured target.
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const animatingRef = useRef(false);
+
+  const toggleShowAll = () => {
+    const el = tableWrapRef.current;
+    if (el) {
+      el.style.height = `${el.scrollHeight}px`;
+      animatingRef.current = true;
+    }
+    setShowAll((v) => !v);
+  };
+
+  useLayoutEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el || !animatingRef.current) return;
+    animatingRef.current = false;
+    const start = el.style.height; // pinned at click time
+    el.style.transition = "none";
+    el.style.height = "auto";
+    const target = el.scrollHeight; // post-render natural height
+    el.style.height = start;
+    void el.offsetHeight; // commit the start height before transitioning
+    el.style.transition = "height 300ms ease-out";
+    el.style.height = `${target}px`;
+    const done = () => {
+      el.style.transition = "";
+      el.style.height = ""; // back to auto so filters/resize reflow freely
+    };
+    const fallback = setTimeout(done, 340);
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName === "height") {
+        clearTimeout(fallback);
+        done();
+      }
+    };
+    el.addEventListener("transitionend", onEnd);
+    return () => {
+      clearTimeout(fallback);
+      el.removeEventListener("transitionend", onEnd);
+    };
+  }, [showAll]);
+
   // 150ms debounce on the search box.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 150);
@@ -317,6 +362,14 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
 
   const valueActive = valueMin !== null || valueMax !== null;
   const anyFilter = search.trim() !== "" || !stagesAreAll || valueActive || ageBuckets.size > 0;
+
+  const canExpand = filtered.length > 12;
+  const toggleLabel =
+    showAll && canExpand
+      ? "Show top 12"
+      : anyFilter
+        ? `Show all matching (${filtered.length})`
+        : `Show all (${filtered.length})`;
 
   const onSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -421,9 +474,23 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
             </button>
           )}
         </div>
-        <p className="font-mono text-[11px] text-ink-faint">
-          Showing {filtered.length} of {open.length} deals · {fmtMoney(filteredValue, { compact: true })}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="font-mono text-[11px] text-ink-faint">
+            Showing {filtered.length} of {open.length} deals · {fmtMoney(filteredValue, { compact: true })}
+          </p>
+          <button
+            type="button"
+            onClick={toggleShowAll}
+            disabled={!canExpand}
+            aria-expanded={showAll && canExpand}
+            className="whitespace-nowrap rounded border border-rule-dark px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rule-dark disabled:hover:text-ink-soft"
+          >
+            {toggleLabel}
+            <span aria-hidden className="ml-1.5 text-[9px]">
+              {showAll && canExpand ? "▲" : "▼"}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* filter bar: stage · value · age — stacks on mobile, single row from sm up */}
@@ -559,6 +626,7 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
         </div>
       )}
 
+      <div ref={tableWrapRef} className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-sm">
           <thead>
@@ -640,16 +708,7 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
           </tbody>
         </table>
       </div>
-
-      {filtered.length > 12 && (
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          className="w-full border-t border-rule px-5 py-2.5 text-xs font-semibold text-accent hover:bg-paper"
-        >
-          {showAll ? "Show top 12" : `Show all ${filtered.length} open deals`}
-        </button>
-      )}
+      </div>
 
       {selected && <OpenDealDrawer deal={selected} onClose={() => setSelected(null)} />}
     </div>

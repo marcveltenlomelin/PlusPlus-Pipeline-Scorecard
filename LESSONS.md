@@ -124,3 +124,27 @@ what to do next time. Read this file before starting any new task.
   (dashed faint outline = deliberately empty, not broken). The close-rate empty bar is `h-6`
   (vs `h-3` filled) specifically to host the overlay text — states swap rarely, so the
   height jump is a non-issue.
+
+### 2026-06-10 · Show-all toggle as a real button (main)
+
+- **Touched**: `Revenue.tsx` only (`OpenDeals`): bottom full-width text toggle deleted;
+  secondary button (bordered, `rounded`, ▼/▲ chevron, `aria-expanded`) added in the toolbar
+  next to the result count; measure-and-transition height animation on a new
+  `overflow-hidden` wrapper around the table's `overflow-x-auto` div.
+- **Decisions**: `rounded` corners are a spec-requested deviation from the app's otherwise
+  square ledger aesthetic. Labels: "Show all (52)" / "Show top 12" / filtered →
+  "Show all matching (N)", disabled (40% opacity) when N ≤ 12.
+- **Surprises**: (1) `height: auto` isn't animatable — the reliable recipe is: pin current
+  `scrollHeight` px in the click handler *before* flipping state, then in a
+  `useLayoutEffect` keyed on the state set `height:auto` → measure target → restore pinned
+  height → force reflow (`void el.offsetHeight`) → set `transition: height 300ms ease-out` +
+  target px → clear both to auto on `transitionend` with a ~340ms setTimeout fallback
+  (transitionend doesn't fire if the tab is backgrounded). Gate the effect on an
+  `animatingRef` so filter-driven height changes don't animate. (2) Setting a
+  React-controlled input's value from page JS needs the native setter
+  (`Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(...)` +
+  `dispatchEvent(new Event('input',{bubbles:true}))`) — assigning `.value` directly is
+  swallowed by React. (3) `prefers-reduced-motion` needed zero extra work — globals.css
+  already neutralizes all transitions globally.
+- **Tip for future-you**: the disabled state needs explicit `disabled:hover:*` resets,
+  otherwise the hover accent still fires on a disabled button (pointer events aren't off).

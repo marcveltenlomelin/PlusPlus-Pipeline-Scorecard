@@ -179,3 +179,34 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: the skeleton overlay is `bg-paper/90`, so stale content ghosts
   through at 10% — deliberate (shows the page isn't blank). `Section`'s error chip carries
   the real error message in `title`; the visible text stays the calm fixed copy.
+
+### 2026-06-10 · Today's Focus prescriptive panel (main)
+
+- **Touched**: new `src/lib/todayFocus.ts` (pure scoring: 5 category generators,
+  normalized 0–100 severity, `computeFocusActions`/`topFocusActions`), new
+  `src/lib/todayFocus.test.ts` (**first unit tests in the repo** — vitest as devDependency,
+  `npm run test`, zero config because the whole lib chain uses relative imports), new
+  `src/components/TodayFocus.tsx` (hero panel), one insertion in `Dashboard.tsx`.
+- **Decisions**: staleness proxy = days since `max(entered.*)` (no stage-history /
+  last-activity on `Deal`; data layer untouched) — yields 835 days for Robinhood, matching
+  the brief's example. One card per category, categories ranked by normalized severity
+  (three different levers beat three copies of one). Pacing anchors to the *current month*
+  regardless of the viewer's selected period. CTAs: HubSpot record links + `#section:<name>`
+  smooth-scroll (no URL-driven filter state exists for "filtered table view" deep links).
+  `deals.length === 0` → no actions (empty data ≠ everything urgent). Dismissals:
+  `localStorage` `{date, ids}` keyed to the local day; filtering lives in the pure lib so
+  the next-ranked candidate fills a dismissed slot.
+- **Surprises**: (1) The panel ranked PACING **Deep Dive 0/5** above SAL 6/31 — correct
+  (worst offender within category wins) but not what the brief's example predicted;
+  severity math beats intuition, trust it. (2) `⟳` (U+27F3) renders as near-tofu in Work
+  Sans buttons; `↻`/`↺` (U+21BB/BA) render fine — the app already used ↺. (3) The
+  long-lived dev server (6h of HMR + two dev-check runs) eventually 500'd every RSC
+  prefetch with `Invariant: Expected clientReferenceManifest to be defined` — looks like an
+  app bug, is actually corrupted `.next` dev state; restart the server before debugging
+  anything (LESSONS pattern #3, now confirmed twice). (4) Vitest picks up `*.test.ts`
+  inside `src/` with zero config; explicit `import { describe... } from "vitest"` also
+  keeps `tsc --noEmit` happy without a types entry.
+- **Tip for future-you**: the scoring lib is deliberately UI-free so an email digest can
+  reuse `computeFocusActions` server-side. Score scales: stale saturates at $50K×365days;
+  pacing/conversion are shortfall ratios ×100; revival is value/$100K (+20% if lost ≤30d);
+  goal milestones are ×0.6-weighted (momentum, not urgency). Tune there, not in the JSX.

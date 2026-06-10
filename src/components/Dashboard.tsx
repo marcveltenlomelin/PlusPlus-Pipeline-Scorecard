@@ -13,6 +13,7 @@ import Pace from "./Pace";
 import Revenue, { OpenDeals, RevenueMath } from "./Revenue";
 import Scoreboard from "./Scoreboard";
 import SkeletonOverlay, { type SkeletonKind } from "./Skeleton";
+import TodayFocus from "./TodayFocus";
 
 /** Uniform chapter treatment: hairline rule, 64px of air, uppercase header, plain-English subtitle. */
 function Section({
@@ -287,6 +288,14 @@ export default function Dashboard() {
 
         {payload && (
           <>
+            <TodayFocus
+              deals={payload.deals}
+              goals={store.goals}
+              now={now}
+              pilotTracked={payload.pilotTracked}
+              syncing={syncing}
+              onRefresh={() => void load(true)}
+            />
             <Section
               title="Stage Entries"
               subtitle={`Deals that entered each stage ${phrase} — actual against goal, not board occupancy.`}

@@ -22,3 +22,22 @@ what to do next time. Read this file before starting any new task.
   `DEV_NO_AUTH=1 PORT=3100 npm run dev` (dev-only bypass in middleware.ts, double-gated by
   NODE_ENV). Reuse /tmp-style scripts against port 3100, and remember `fmtNum()` already
   formats fractional goals to one decimal — don't reinvent.
+
+### 2026-06-10 · Pace-to-Goal bar redesign (main)
+
+- **Touched**: `src/components/Pace.tsx` (28px bar, 4-state fill via `pacingBadge()`,
+  marker labels, hover tooltip, removed the redundant stats row), `src/lib/periods.ts`
+  (new `dayOfPeriod()`), `src/components/Metric.tsx` (exported `POP_PANEL`; `PaceBadge`
+  now reused as the card chip so chip and fill can't disagree).
+- **Surprises**: (1) `scripts/dev-check.sh` boots its own dev server on port 3000 that
+  shares `.next` with a long-running port-3100 server — it clobbers compiled route
+  artifacts and the 3100 server starts 500ing (`ENOENT .next/server/app/api/...`).
+  Restart the 3100 server after running dev-check. (2) The `.rise` sections create their
+  own stacking contexts, so a popover that opens *downward* out of one section gets
+  painted over by the next section's heading regardless of z-index — open popovers
+  upward, over their own card. (3) Marker labels clamped away from their marker lose the
+  visual association; right-anchoring the label to the marker once it passes ~55% reads
+  much better than a symmetric clamp.
+- **Tip for future-you**: the bar's "Expected today" label hides the "Goal" label when
+  the expected marker passes 82% of the track — they'd collide at end of period and say
+  nearly the same number anyway.

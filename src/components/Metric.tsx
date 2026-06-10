@@ -27,7 +27,7 @@ function usePop() {
   return { open, setOpen, ref };
 }
 
-const POP_PANEL =
+export const POP_PANEL =
   "absolute left-1/2 top-full z-40 mt-2 block w-64 -translate-x-1/2 border border-rule-dark bg-panel p-3 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-ink-soft shadow-pop";
 
 /** Small info popover — every number's definition, one keypress away. */

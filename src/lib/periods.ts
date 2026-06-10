@@ -124,6 +124,15 @@ export function elapsedFraction(key: string, now: number): number {
   return Math.min(1, Math.max(0, (now - s) / (e - s)));
 }
 
+/** 1-based day of the period plus total days, in the viewer's local timezone. */
+export function dayOfPeriod(key: string, now: number): { day: number; total: number } {
+  const s = periodStart(key).getTime();
+  const e = periodEnd(key).getTime();
+  const total = Math.round((e - s) / MS_DAY);
+  const day = Math.min(total, Math.max(1, Math.floor((now - s) / MS_DAY) + 1));
+  return { day, total };
+}
+
 export function isCurrentPeriod(key: string, now: number): boolean {
   return key === periodKey(now, granularityOf(key));
 }

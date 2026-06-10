@@ -2,11 +2,11 @@
 
 import { DEFINITIONS } from "@/lib/config";
 import { fmtNum } from "@/lib/format";
-import { enteredInPeriod, pace } from "@/lib/metrics";
-import { isCurrentPeriod, periodPhrase } from "@/lib/periods";
+import { enteredInPeriod, pace, pacingBadge, type PacingState } from "@/lib/metrics";
+import { dayOfPeriod, granularityOf, isCurrentPeriod, periodPhrase } from "@/lib/periods";
 import type { Deal, GoalStage, Granularity, StageKey } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
-import { InfoTip, Metric } from "./Metric";
+import { InfoTip, Metric, PaceBadge, POP_PANEL } from "./Metric";
 import { defaultGoal } from "./Scoreboard";
 
 interface PaceProps {
@@ -18,12 +18,19 @@ interface PaceProps {
   onGoalReset: (stage: GoalStage) => void;
 }
 
-const STATUS_STYLE = {
-  done: { chip: "bg-good-soft text-good", label: "goal hit" },
-  ahead: { chip: "bg-good-soft text-good", label: "ahead" },
-  "on-track": { chip: "bg-good-soft text-good", label: "on track" },
-  behind: { chip: "bg-bad-soft text-bad", label: "behind" },
-} as const;
+const FILL_STYLE: Record<PacingState, { bar: string; text: string }> = {
+  ahead: { bar: "bg-ahead", text: "text-ahead" },
+  "on-pace": { bar: "bg-good", text: "text-good" },
+  "slightly-behind": { bar: "bg-warn", text: "text-warn" },
+  "at-risk": { bar: "bg-bad", text: "text-bad" },
+};
+
+const PERIOD_END_PHRASE: Record<Granularity, string> = {
+  week: "week end",
+  month: "month end",
+  quarter: "quarter end",
+  year: "year end",
+};
 
 function PaceCard({
   title,
@@ -54,8 +61,18 @@ function PaceCard({
   const { value: actual } = useResolved(actualId, liveActual);
   const m = pace(actual ?? 0, goal, period, now);
   const current = isCurrentPeriod(period, now);
-  const style = STATUS_STYLE[m.status];
+  const badge = pacingBadge(actual ?? 0, goal, period, now);
+  const state: PacingState = badge?.state ?? "on-pace";
+  const fill = FILL_STYLE[state];
   const pct = (n: number) => Math.min(100, (n / Math.max(goal, 0.0001)) * 100);
+  const fillPct = pct(m.actual);
+  const actualInside = fillPct >= 14; // narrower than this and the number sits outside the fill
+  const projected = Math.round(m.projected * 10) / 10;
+  const pctComplete = goal > 0 ? Math.round((m.actual / goal) * 100) : 0;
+  const { day, total } = dayOfPeriod(period, now);
+  const tooltip = current
+    ? `Actual ${fmtNum(m.actual)} of goal ${fmtNum(goal)} · ${pctComplete}% complete · expected ${fmtNum(m.expected)} by day ${day} of ${total} · on track for ${fmtNum(projected)} by ${PERIOD_END_PHRASE[granularityOf(period)]}`
+    : `Actual ${fmtNum(m.actual)} of goal ${fmtNum(goal)} · ${pctComplete}% attainment · period ended`;
 
   return (
     <article className="border border-rule bg-panel p-5 shadow-card">
@@ -79,49 +96,91 @@ function PaceCard({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${style.chip}`}>
-            {style.label}
-          </span>
+          <PaceBadge
+            state={state}
+            actual={actual ?? 0}
+            expected={m.expected}
+            ratio={badge?.ratio ?? (m.expected > 0 ? (actual ?? 0) / m.expected : 1)}
+            periodPhrase={periodPhrase(period, now)}
+          />
           <InfoTip text={DEFINITIONS.pace + " " + DEFINITIONS.goal} label={`${title} pace`} />
         </div>
       </div>
 
-      {/* progress: actual fill, expected-by-today tick, goal = full track */}
-      <div className="relative mt-5 h-3 w-full bg-paper outline outline-1 outline-rule-dark" role="img"
-        aria-label={`${fmtNum(actual ?? 0)} of ${fmtNum(goal)}; expected by today ${fmtNum(m.expected)}; projected ${fmtNum(m.projected)}`}>
-        <div
-          className={`h-full transition-[width] duration-500 ${m.status === "behind" ? "bg-bad" : "bg-good"}`}
-          style={{ width: `${pct(m.actual)}%` }}
-        />
-        {current && (
-          <div
-            className="absolute top-[-5px] h-[22px] w-[2px] bg-ink"
-            style={{ left: `${pct(m.expected)}%` }}
-            title={`Expected by today: ${fmtNum(m.expected)}`}
-          />
-        )}
-      </div>
+      {/* progress: solid pacing-state fill, expected-today + projected markers, full track = goal */}
+      <div
+        className="group relative mt-4"
+        role="img"
+        aria-label={`${fmtNum(m.actual)} of ${fmtNum(goal)}; expected by today ${fmtNum(m.expected)}; projected ${fmtNum(m.projected)}`}
+      >
+        <div className="relative h-4 text-[9px] font-bold uppercase tracking-wider">
+          {current && (
+            <span
+              className="absolute bottom-0.5 whitespace-nowrap text-ink"
+              style={
+                // keep the label glued to its marker: centered on it when there's room,
+                // right-anchored to it once the marker drifts toward the goal label
+                pct(m.expected) > 55
+                  ? { right: `calc(${100 - pct(m.expected)}% + 0.3rem)` }
+                  : { left: `clamp(4.5rem, ${pct(m.expected)}%, calc(100% - 9.5rem))`, transform: "translateX(-50%)" }
+              }
+            >
+              Expected today · {fmtNum(m.expected)}
+            </span>
+          )}
+          {!(current && pct(m.expected) > 82) && (
+            <span className="absolute bottom-0.5 right-0 text-ink-faint">Goal · {fmtNum(goal)}</span>
+          )}
+        </div>
 
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-        <div>
-          <dt className="text-[10px] uppercase tracking-wider text-ink-faint">Actual</dt>
-          <dd className="font-mono text-sm font-semibold">{fmtNum(actual ?? 0)}</dd>
+        <div className="relative h-7 w-full bg-ink/10">
+          <div
+            className={`flex h-full items-center justify-end ${fill.bar} transition-[width] duration-500`}
+            style={{ width: `${fillPct}%` }}
+          >
+            {actualInside && (
+              <span className="px-2 font-mono text-sm font-bold text-paper">{fmtNum(m.actual)}</span>
+            )}
+          </div>
+          {!actualInside && (
+            <span
+              className={`absolute top-1/2 -translate-y-1/2 font-mono text-sm font-bold ${fill.text}`}
+              style={{ left: `calc(${fillPct}% + 0.4rem)` }}
+            >
+              {fmtNum(m.actual)}
+            </span>
+          )}
+          {current && (
+            <>
+              <div
+                className="absolute -bottom-1 -top-1 w-[2px] -translate-x-1/2 bg-ink"
+                style={{ left: `${pct(m.expected)}%` }}
+              />
+              <div
+                className="absolute -bottom-1 -top-1 -translate-x-1/2 border-l-2 border-dashed border-accent"
+                style={{ left: `${pct(m.projected)}%` }}
+              />
+            </>
+          )}
         </div>
-        <div>
-          <dt className="text-[10px] uppercase tracking-wider text-ink-faint">
-            {current ? "Expected today" : "Goal"}
-          </dt>
-          <dd className="font-mono text-sm font-semibold">{fmtNum(current ? m.expected : goal)}</dd>
-        </div>
-        <div>
-          <dt className="text-[10px] uppercase tracking-wider text-ink-faint">
-            {current ? "Projected finish" : "Attainment"}
-          </dt>
-          <dd className={`font-mono text-sm font-semibold ${m.status === "behind" ? "text-bad" : "text-good"}`}>
-            {current ? fmtNum(Math.round(m.projected * 10) / 10) : `${Math.round((m.actual / goal) * 100)}%`}
-          </dd>
-        </div>
-      </dl>
+
+        {current && (
+          <div className="relative h-4 text-[9px] font-bold uppercase tracking-wider">
+            <span
+              className="absolute top-1 -translate-x-1/2 whitespace-nowrap text-accent"
+              style={{ left: `clamp(3.5rem, ${pct(m.projected)}%, calc(100% - 3.5rem))` }}
+            >
+              Projected · {fmtNum(projected)}
+              {m.projected > goal ? " →" : ""}
+            </span>
+          </div>
+        )}
+
+        {/* opens upward: later sections are their own stacking contexts and would paint over a drop-down panel */}
+        <span role="tooltip" className={`${POP_PANEL} invisible bottom-full !top-auto !mt-0 mb-2 group-hover:visible`}>
+          {tooltip}
+        </span>
+      </div>
     </article>
   );
 }

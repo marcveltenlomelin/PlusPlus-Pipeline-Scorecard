@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# local env — holds HUBSPOT_TOKEN, never commit
+.env*.local
+.env
+
+# local persistence (overrides, goals, fetch cache)
+data/

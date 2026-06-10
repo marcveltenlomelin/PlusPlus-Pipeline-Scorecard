@@ -148,3 +148,34 @@ what to do next time. Read this file before starting any new task.
   already neutralizes all transitions globally.
 - **Tip for future-you**: the disabled state needs explicit `disabled:hover:*` resets,
   otherwise the hover accent still fires on a disabled button (pointer events aren't off).
+
+### 2026-06-10 · Sync loading skeletons (main)
+
+- **Touched**: new `Skeleton.tsx` (`SkeletonOverlay`, 5 shape kinds), `globals.css`
+  (`shimmer` keyframes/class), `Dashboard.tsx` (`Section` gains loading/skeleton/error/
+  onRetry; `load()` split into independent deals/store chains; `fatal` replaced by
+  `syncError` — banner only when no payload, per-section chips otherwise), `Header.tsx`
+  (spinner in disabled REFRESH, 1.2s green flash on `fetchedAt` change).
+- **Decisions (single-query interpretation, noted for the owner)**: all 7 sections derive
+  from ONE `/api/deals` payload — "progressive per-section rendering" was implemented as
+  per-data-source (deals and store each apply the moment they land; the old `Promise.all`
+  gated both). No artificial stagger to fake latency; no per-section API split (data-layer
+  guardrail). Failure chips render in every section header because the one sync feeds all
+  of them. Skeletons are refresh-only; first load keeps the full-page state.
+- **Surprises**: (1) Capturing a mid-sync screenshot needs the in-flight window to outlast
+  Playwright-MCP tool latency (~10-25s per screenshot+inspect round trip) — an 8s in-page
+  fetch delay was eaten before the screenshot landed; 30s+ worked. Patch
+  `window.fetch` in-page (delay or synthetic 500 `Response`) — runtime-only, survives
+  zero reloads, no code changes. (2) The dev tab wedged once at the pre-mount "loading
+  scoreboard…" state after many HMR full reloads + fetch patches (no console error, server
+  healthy) — a hard navigation fixed it; it's a dev-mode artifact, not app code, but don't
+  burn time debugging the app when the dev log shows clean compiles. (3) Synthetic-500
+  failures resolve in microtasks, so "is the button in Syncing state" sampled at 150ms
+  misses the whole flight — verify instant-failure paths by counting intercepted calls or
+  by their effects (chips), not by timing. (4) React state updates inside split promise
+  chains: clear the skeleton flag in the deals chain's `finally`, clear the button flag
+  after `Promise.allSettled` — two different lifetimes, two flags (`syncing` vs
+  `refreshing`).
+- **Tip for future-you**: the skeleton overlay is `bg-paper/90`, so stale content ghosts
+  through at 10% — deliberate (shows the page isn't blank). `Section`'s error chip carries
+  the real error message in `title`; the visible text stays the calm fixed copy.

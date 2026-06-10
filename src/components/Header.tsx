@@ -114,6 +114,21 @@ interface HeaderProps {
 
 export default function Header(p: HeaderProps) {
   const current = isCurrentPeriod(p.period, p.now);
+
+  // Flash the synced timestamp green for 1.2s when a refresh lands.
+  const [flash, setFlash] = useState(false);
+  const prevFetchedAt = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const at = p.payload?.fetchedAt;
+    if (at !== undefined && prevFetchedAt.current !== undefined && at !== prevFetchedAt.current) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 1200);
+      prevFetchedAt.current = at;
+      return () => clearTimeout(t);
+    }
+    prevFetchedAt.current = at;
+  }, [p.payload?.fetchedAt]);
+
   return (
     // sticky from md up only — the wrapped mobile header would eat a quarter of the viewport
     <header className="top-0 z-30 border-b-2 border-ink bg-paper md:sticky">
@@ -193,7 +208,9 @@ export default function Header(p: HeaderProps) {
           <span className="text-right text-[11px] leading-tight text-ink-faint">
             {p.payload ? (
               <>
-                {p.payload.source === "demo" ? "demo data" : `synced ${fmtDateTime(p.payload.fetchedAt)}`}
+                <span className={`transition-colors duration-300 ${flash ? "font-semibold text-good" : ""}`}>
+                  {p.payload.source === "demo" ? "demo data" : `synced ${fmtDateTime(p.payload.fetchedAt)}`}
+                </span>
                 <br />
                 <span className={p.payload.source === "live" ? "text-good" : p.payload.source === "cache" ? "text-warn" : ""}>
                   {p.payload.source === "live" ? "● live" : p.payload.source === "cache" ? "● cached" : "● sample"}
@@ -207,8 +224,14 @@ export default function Header(p: HeaderProps) {
             type="button"
             onClick={p.onRefresh}
             disabled={p.refreshing}
-            className="border border-ink bg-ink px-3 py-2 text-xs font-bold uppercase tracking-wider text-paper transition-colors hover:bg-accent hover:border-accent disabled:opacity-50"
+            className="inline-flex items-center gap-2 border border-ink bg-ink px-3 py-2 text-xs font-bold uppercase tracking-wider text-paper transition-colors hover:bg-accent hover:border-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-ink disabled:hover:bg-ink"
           >
+            {p.refreshing && (
+              <span
+                aria-hidden
+                className="size-3 shrink-0 animate-spin rounded-full border-2 border-paper/40 border-t-paper"
+              />
+            )}
             {p.refreshing ? "Syncing…" : "Refresh"}
           </button>
           <HowToRead />

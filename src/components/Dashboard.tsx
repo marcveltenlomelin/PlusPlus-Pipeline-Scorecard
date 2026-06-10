@@ -12,29 +12,62 @@ import Header from "./Header";
 import Pace from "./Pace";
 import Revenue, { OpenDeals, RevenueMath } from "./Revenue";
 import Scoreboard from "./Scoreboard";
+import SkeletonOverlay, { type SkeletonKind } from "./Skeleton";
 
 /** Uniform chapter treatment: hairline rule, 64px of air, uppercase header, plain-English subtitle. */
 function Section({
   title,
   subtitle,
   delay,
+  loading,
+  skeleton,
+  error,
+  onRetry,
   children,
 }: {
   title: string;
   subtitle: string;
   delay: number;
+  /** A refresh is in flight — cover the content with a shimmer skeleton. */
+  loading?: boolean;
+  skeleton?: SkeletonKind;
+  /** The last refresh failed — show an inline chip; stale data stays usable. */
+  error?: string | null;
+  onRetry?: () => void;
   children: ReactNode;
 }) {
   return (
     <section
       data-section={title}
       aria-label={title}
+      aria-busy={loading || undefined}
       className="rise border-t border-rule pt-16"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <h2 className="text-sm font-bold uppercase tracking-[0.05em] text-ink-soft">{title}</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-sm font-bold uppercase tracking-[0.05em] text-ink-soft">{title}</h2>
+        {error && (
+          <span
+            role="status"
+            title={error}
+            className="inline-flex items-center gap-1.5 border border-bad/40 bg-bad-soft px-2 py-0.5 text-[11px] text-bad"
+          >
+            {"Couldn't refresh"} ·
+            <button
+              type="button"
+              onClick={onRetry}
+              className="font-semibold underline underline-offset-2 hover:opacity-75"
+            >
+              Retry
+            </button>
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-xs text-ink-faint">{subtitle}</p>
-      <div className="mt-4">{children}</div>
+      <div className="relative mt-4">
+        {children}
+        {loading && skeleton && <SkeletonOverlay kind={skeleton} />}
+      </div>
     </section>
   );
 }
@@ -59,7 +92,10 @@ export default function Dashboard() {
   const [store, setStore] = useState<Store>({ goals: defaultGoals(), overrides: {} });
   const [drill, setDrill] = useState<DrillSpec | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [fatal, setFatal] = useState<string | null>(null);
+  /** Skeletons show while a refresh's deals fetch is in flight (never on first load). */
+  const [syncing, setSyncing] = useState(false);
+  /** Last sync failure. With data on screen → per-section chips; without → page banner. */
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   // Scroll-aware nav indicator: a section is "current" while it overlaps a thin
@@ -110,26 +146,35 @@ export default function Dashboard() {
     };
   }, [payload]);
 
+  // Deals and store load independently — each applies the moment it lands, so
+  // sections never wait on the slower of the two. (All sections derive from the
+  // single deals payload by design; that one fetch is the only deal "query".)
   const load = useCallback(async (refresh: boolean) => {
     setRefreshing(true);
-    try {
-      const [dealsRes, storeRes] = await Promise.all([
-        fetch(`/api/deals${refresh ? "?refresh=1" : ""}`),
-        fetch("/api/store"),
-      ]);
-      if (!dealsRes.ok) {
-        const body = await dealsRes.json().catch(() => ({}));
-        throw new Error(body.error ?? `Sync failed (${dealsRes.status})`);
+    if (refresh) setSyncing(true);
+    const dealsChain = (async () => {
+      const res = await fetch(`/api/deals${refresh ? "?refresh=1" : ""}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Sync failed (${res.status})`);
       }
-      setPayload(await dealsRes.json());
-      if (storeRes.ok) setStore(await storeRes.json());
+      setPayload(await res.json());
       setNow(Date.now());
-      setFatal(null);
-    } catch (err) {
-      setFatal(err instanceof Error ? err.message : "Sync failed");
-    } finally {
-      setRefreshing(false);
-    }
+      setSyncError(null);
+    })()
+      .catch((err) => {
+        setSyncError(err instanceof Error ? err.message : "Sync failed");
+      })
+      .finally(() => setSyncing(false));
+    const storeChain = fetch("/api/store")
+      .then(async (res) => {
+        if (res.ok) setStore(await res.json());
+      })
+      .catch(() => {
+        // goals/overrides keep their previous values; deals are the headline
+      });
+    await Promise.allSettled([dealsChain, storeChain]);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -228,13 +273,13 @@ export default function Dashboard() {
             {payload.error ?? "unknown error"}. Numbers reflect the previous sync — hit Refresh to retry.
           </p>
         )}
-        {fatal && (
+        {syncError && !payload && (
           <p className="border border-bad/40 bg-bad-soft px-4 py-2.5 text-xs text-bad" role="alert">
-            <strong className="font-bold">Sync failed:</strong> {fatal}
+            <strong className="font-bold">Sync failed:</strong> {syncError}
           </p>
         )}
 
-        {!payload && !fatal && (
+        {!payload && !syncError && (
           <div className="grid place-items-center py-32 text-sm text-ink-faint" role="status">
             <p className="font-mono animate-pulse">syncing with HubSpot…</p>
           </div>
@@ -246,6 +291,10 @@ export default function Dashboard() {
               title="Stage Entries"
               subtitle={`Deals that entered each stage ${phrase} — actual against goal, not board occupancy.`}
               delay={0}
+              loading={syncing}
+              skeleton="cards"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <Scoreboard
                 deals={payload.deals}
@@ -262,6 +311,10 @@ export default function Dashboard() {
               title="Funnel Trend"
               subtitle={`How many deals hit each stage, ${granularity} by ${granularity}.`}
               delay={60}
+              loading={syncing}
+              skeleton="chart"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <FunnelTrend
                 deals={payload.deals}
@@ -275,6 +328,10 @@ export default function Dashboard() {
               title="Pace to Goal"
               subtitle={`Are SALs and Net New Opps on pace for ${phrase}?`}
               delay={120}
+              loading={syncing}
+              skeleton="bars"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <Pace
                 deals={payload.deals}
@@ -289,6 +346,10 @@ export default function Dashboard() {
               title="Funnel Leaks"
               subtitle="Where deals stall — stage-to-stage conversion over the trailing 90 days."
               delay={180}
+              loading={syncing}
+              skeleton="cards"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <Funnel deals={payload.deals} pilotTracked={payload.pilotTracked} />
             </Section>
@@ -296,6 +357,10 @@ export default function Dashboard() {
               title="Revenue"
               subtitle="Dollars created and closed against the $1.2M net-new ARR target."
               delay={240}
+              loading={syncing}
+              skeleton="cards"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <Revenue deals={payload.deals} period={period} granularity={granularity} />
             </Section>
@@ -303,6 +368,10 @@ export default function Dashboard() {
               title="Open Deals"
               subtitle="Every open deal on the board, biggest first — the audit trail behind the numbers."
               delay={300}
+              loading={syncing}
+              skeleton="table"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <OpenDeals deals={payload.deals} />
             </Section>
@@ -310,6 +379,10 @@ export default function Dashboard() {
               title="Revenue Math"
               subtitle="The bottom line: closed-won run rate × average deal size, straight-lined to Dec 31."
               delay={360}
+              loading={syncing}
+              skeleton="row"
+              error={syncError}
+              onRetry={() => void load(true)}
             >
               <RevenueMath deals={payload.deals} />
             </Section>

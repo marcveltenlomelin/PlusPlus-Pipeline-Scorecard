@@ -78,6 +78,21 @@ button {
   color: var(--color-ink-faint);
 }
 
+/* loading-skeleton sweep — a light band travelling across the overlay */
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer {
+  animation: shimmer 1.4s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgb(235 233 226 / 0.05), transparent);
+}
+
 @keyframes rise {
   from {
     opacity: 0;

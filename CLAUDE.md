@@ -100,8 +100,8 @@ LESSONS.md entry after finishing one. Plan before writing code and get the plan 
 390px** widths (store in `tests/visual/`). Never weaken or delete tests to make things
 pass. Ask when ambiguous.
 
-**Trunk-based, no PRs** (owner's preference, 2026-06-10): commit small reviewable commits
-directly on `main`. No feature branches, no pull requests, nothing for the owner to merge.
-When the owner says to ship/push live: `git push origin main` then `vercel deploy --prod`
-(CLI is linked to the `plus-plus-pipeline-scorecard` project). Deploy only on command —
-verified work can sit committed on `main` until then.
+**Trunk-based, no PRs, deploy on completion** (owner's preference, 2026-06-10): commit
+small reviewable commits directly on `main`. No feature branches, no pull requests,
+nothing for the owner to merge. After finishing and verifying a prompted task, ship it
+without waiting to be asked: `git push origin main` then `vercel deploy --prod` (CLI is
+linked to the `plus-plus-pipeline-scorecard` project).

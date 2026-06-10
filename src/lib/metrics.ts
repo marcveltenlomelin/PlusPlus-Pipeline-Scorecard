@@ -1,5 +1,5 @@
-import { TRAILING_WINDOW_DAYS } from "./config";
-import { elapsedFraction, inPeriod } from "./periods";
+import { AT_RISK_THRESHOLD, TRAILING_WINDOW_DAYS } from "./config";
+import { elapsedFraction, granularityOf, inPeriod, isCurrentPeriod } from "./periods";
 import type { Deal, StageKey } from "./types";
 
 /**
@@ -93,6 +93,42 @@ export function pace(actual: number, goal: number, key: string, now: number): Pa
   else if (projected >= goal) status = projected >= goal * 1.15 ? "ahead" : "on-track";
   else status = "behind";
   return { actual, goal, expected, projected, elapsed, status };
+}
+
+export type PacingState = "ahead" | "on-pace" | "slightly-behind" | "at-risk";
+
+export interface PacingBadge {
+  state: PacingState;
+  ratio: number;
+  expected: number;
+}
+
+/**
+ * Badge state for a Stage Entry card: actual vs where the goal says the
+ * stage should be by now (expected = goal × elapsed fraction — the same
+ * straight-line math as pace()). Bands: ≥1.15 ahead · ≥0.9 on pace ·
+ * ≥0.6 slightly behind · else at risk. Weeks keep the old simple rule:
+ * flag only when behind the 75% line, and amber (never red) before
+ * mid-week — a few quiet days early in a short period aren't a signal.
+ */
+export function pacingBadge(
+  actual: number,
+  goal: number | undefined,
+  key: string,
+  now: number
+): PacingBadge | null {
+  if (!goal) return null;
+  const elapsed = isCurrentPeriod(key, now) ? elapsedFraction(key, now) : 1;
+  const expected = goal * elapsed;
+  if (expected <= 0) return null;
+  const ratio = actual / expected;
+  if (granularityOf(key) === "week") {
+    if (actual >= AT_RISK_THRESHOLD * expected) return null;
+    return { state: elapsed < 0.5 ? "slightly-behind" : "at-risk", ratio, expected };
+  }
+  const state: PacingState =
+    ratio >= 1.15 ? "ahead" : ratio >= 0.9 ? "on-pace" : ratio >= 0.6 ? "slightly-behind" : "at-risk";
+  return { state, ratio, expected };
 }
 
 /** Open deals that have entered a given stage — the live pipeline basis. */

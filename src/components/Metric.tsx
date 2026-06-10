@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fmtNum } from "@/lib/format";
+import type { PacingState } from "@/lib/metrics";
 import { useDash, useResolved } from "./ctx";
 
 /** Shared dismiss-on-outside-click / Escape behavior for small popovers. */
@@ -52,39 +53,48 @@ export function InfoTip({ text, label }: { text: string; label?: string }) {
   );
 }
 
+const PACING_STYLE: Record<PacingState, { label: string; cls: string }> = {
+  ahead: { label: "ahead", cls: "bg-ahead-soft text-ahead hover:bg-ahead hover:text-paper" },
+  "on-pace": { label: "on pace", cls: "bg-good-soft text-good hover:bg-good hover:text-paper" },
+  "slightly-behind": { label: "slightly behind", cls: "bg-warn-soft text-warn hover:bg-warn hover:text-paper" },
+  "at-risk": { label: "at risk", cls: "bg-bad-soft text-bad hover:bg-bad hover:text-white" },
+};
+
 /**
- * The "at risk" flag — clickable, and it shows its work: actual vs where the
- * goal says you should be by now, and the 75% line that triggered the flag.
+ * The pacing flag — clickable, and it shows its work: actual vs where the
+ * goal says the stage should be by this point in the period.
  */
-export function RiskBadge({
+export function PaceBadge({
+  state,
   actual,
-  goal,
-  expected,
+  expected, // goal prorated to time elapsed
+  ratio,
   periodPhrase,
 }: {
+  state: PacingState;
   actual: number;
-  goal: number;
-  expected: number; // goal prorated to time elapsed
+  expected: number;
+  ratio: number;
   periodPhrase: string;
 }) {
   const { open, setOpen, ref } = usePop();
-  const threshold = expected * 0.75;
-  const gap = Math.max(0, Math.ceil(goal - actual));
+  const { label, cls } = PACING_STYLE[state];
   return (
     <span ref={ref} className="relative inline-block">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="bg-bad-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-bad transition-colors hover:bg-bad hover:text-white"
+        className={`whitespace-nowrap px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors ${cls}`}
       >
-        at risk
+        {label}
       </button>
       {open && (
         <span role="tooltip" className={POP_PANEL}>
-          <strong className="text-ink">Behind pace.</strong> {fmtNum(actual)} so far vs ~{fmtNum(expected)} expected
-          by this point {periodPhrase} (goal {fmtNum(goal)}). Stages drop below {fmtNum(threshold)} — 75% of
-          goal-to-date — get this flag. Gap to goal: {gap}.
+          <strong className="text-ink">
+            Expected by today: {fmtNum(expected)} · Actual: {fmtNum(actual)} · Pace: {Math.round(ratio * 100)}%
+          </strong>{" "}
+          Straight-line: the goal, prorated to how much of {periodPhrase} has elapsed.
         </span>
       )}
     </span>

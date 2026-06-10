@@ -36,8 +36,20 @@ function HowToRead() {
       "Actual vs goal. Goals come from the model: $1.2M ARR ÷ $50K = 24 wins/year, worked backwards up the funnel. Click a goal to edit it; ↺ resets to the model.",
     ],
     [
-      <span key="r" className="bg-bad-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-bad">at risk</span>,
-      "Below 75% of where the goal says you should be by today. Click the chip for the math.",
+      <span key="p1" className="bg-ahead-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ahead">ahead</span>,
+      "At 115%+ of expected-by-today (the goal prorated to how much of the period has elapsed). Click any pace chip for the math.",
+    ],
+    [
+      <span key="p2" className="bg-good-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-good">on pace</span>,
+      "Between 90% and 115% of expected-by-today.",
+    ],
+    [
+      <span key="p3" className="whitespace-nowrap bg-warn-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-warn">slightly behind</span>,
+      "Between 60% and 90% of expected-by-today. Week view flags only shortfalls (below 75%), and stays amber until mid-week — a slow Monday isn't a signal.",
+    ],
+    [
+      <span key="p4" className="bg-bad-soft px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-bad">at risk</span>,
+      "Below 60% of expected-by-today (week view: below 75% after mid-week). Closed Won/Lost are context tiles and never carry a pace chip.",
     ],
     [
       <span key="m" className="bg-manual-soft px-1 py-px text-[9px] font-bold uppercase tracking-wider text-manual">manual</span>,
@@ -68,7 +80,7 @@ function HowToRead() {
           <h2 className="font-display text-sm font-bold tracking-tight">How to read this dashboard</h2>
           <dl className="mt-3 space-y-3">
             {items.map(([badge, text], i) => (
-              <div key={i} className="grid grid-cols-[3.5rem_1fr] gap-2">
+              <div key={i} className="grid grid-cols-[5.75rem_1fr] gap-2">
                 <dt className="pt-0.5 text-right">{badge}</dt>
                 <dd className="text-xs leading-relaxed text-ink-soft">{text}</dd>
               </div>

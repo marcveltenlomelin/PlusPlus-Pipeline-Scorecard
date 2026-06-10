@@ -191,7 +191,7 @@ export default function Header(p: HeaderProps) {
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/signin" })}
-            className="border border-rule-dark px-3 py-2 text-xs font-bold uppercase tracking-wider text-ink-soft transition-colors hover:border-accent hover:text-accent"
+            className="text-[11px] text-ink-faint underline underline-offset-2 transition-colors hover:text-accent"
           >
             Sign out
           </button>

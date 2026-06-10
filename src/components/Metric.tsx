@@ -6,7 +6,7 @@ import type { PacingState } from "@/lib/metrics";
 import { useDash, useResolved } from "./ctx";
 
 /** Shared dismiss-on-outside-click / Escape behavior for small popovers. */
-function usePop() {
+export function usePop() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {

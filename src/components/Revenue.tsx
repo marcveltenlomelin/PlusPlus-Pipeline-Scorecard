@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ARR_TARGET,
   AVG_DEAL_SIZE,
@@ -11,10 +11,20 @@ import {
 } from "@/lib/config";
 import { daysAgo, fmtDate, fmtMoney, fmtPct } from "@/lib/format";
 import { closeRate, enteredInPeriod, openPipeline, valueEnteredBetween } from "@/lib/metrics";
+import {
+  AGE_BUCKETS,
+  DEFAULT_SORT_DIR,
+  VALUE_CHIPS,
+  filterOpenDeals,
+  sortOpenDeals,
+  type SortDir,
+  type SortKey,
+} from "@/lib/openDeals";
 import { periodPhrase } from "@/lib/periods";
 import type { Deal, Granularity } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
-import { InfoTip, Metric } from "./Metric";
+import { InfoTip, Metric, usePop } from "./Metric";
+import OpenDealDrawer from "./OpenDealDrawer";
 
 interface RevenueProps {
   deals: Deal[];
@@ -224,71 +234,419 @@ export function RevenueMath({ deals }: { deals: Deal[] }) {
   );
 }
 
+/** Removable active-filter chip. */
+function Pill({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 border border-rule-dark bg-paper px-2 py-0.5 text-xs text-ink-soft">
+      {children}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label="Remove filter"
+        className="text-ink-faint hover:text-bad"
+      >
+        ✕
+      </button>
+    </span>
+  );
+}
+
+function valueRangeLabel(min: number | null, max: number | null): string {
+  const m = (n: number) => fmtMoney(n, { compact: true });
+  if (min !== null && max !== null) return `${m(min)}–${m(max)}`;
+  if (min !== null) return `≥ ${m(min)}`;
+  if (max !== null) return `≤ ${m(max)}`;
+  return "";
+}
+
+const FILTER_CTRL =
+  "border border-rule bg-paper px-2 py-1 text-xs text-ink hover:border-rule-dark focus:border-accent focus:outline-none";
+
 export function OpenDeals({ deals }: { deals: Deal[] }) {
   const { now } = useDash();
+
+  const open = useMemo(() => deals.filter((d) => d.isOpen), [deals]);
+  const stageOptions = useMemo(
+    () => Array.from(new Set(open.map((d) => d.stageLabel))).sort(),
+    [open]
+  );
+
+  // UI chrome — all local state.
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("age");
+  const [sortDir, setSortDir] = useState<SortDir>("desc"); // stalest first
+  const [stages, setStages] = useState<Set<string> | null>(null); // null = all
+  const [valueMin, setValueMin] = useState<number | null>(null);
+  const [valueMax, setValueMax] = useState<number | null>(null);
+  const [ageBuckets, setAgeBuckets] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
-  const open = deals.filter((d) => d.isOpen).sort((a, b) => b.value - a.value);
-  const visible = showAll ? open : open.slice(0, 12);
-  const total = open.reduce((s, d) => s + d.value, 0);
+  const [selected, setSelected] = useState<Deal | null>(null);
+
+  const stagePop = usePop();
+
+  // 150ms debounce on the search box.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 150);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const effectiveStages = useMemo(() => stages ?? new Set(stageOptions), [stages, stageOptions]);
+  const stagesAreAll = stageOptions.every((s) => effectiveStages.has(s)) && effectiveStages.size === stageOptions.length;
+
+  const filtered = useMemo(
+    () =>
+      filterOpenDeals(
+        open,
+        { search: debouncedSearch, stages: effectiveStages, valueMin, valueMax, ageBuckets },
+        now
+      ),
+    [open, debouncedSearch, effectiveStages, valueMin, valueMax, ageBuckets, now]
+  );
+  const sorted = useMemo(
+    () => sortOpenDeals(filtered, sortKey, sortDir, now),
+    [filtered, sortKey, sortDir, now]
+  );
+  const visible = showAll ? sorted : sorted.slice(0, 12);
+  const filteredValue = filtered.reduce((s, d) => s + d.value, 0);
+
+  const valueActive = valueMin !== null || valueMax !== null;
+  const anyFilter = search.trim() !== "" || !stagesAreAll || valueActive || ageBuckets.size > 0;
+
+  const onSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(DEFAULT_SORT_DIR[key]);
+    }
+  };
+
+  const toggleStage = (label: string) =>
+    setStages((prev) => {
+      const next = new Set(prev ?? stageOptions);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  const removeStage = (label: string) =>
+    setStages((prev) => {
+      const next = new Set(prev ?? stageOptions);
+      next.delete(label);
+      return next;
+    });
+
+  const toggleAge = (key: string) =>
+    setAgeBuckets((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const valueChipActive = (min: number | null, max: number | null) => valueMin === min && valueMax === max;
+  const onValueChip = (min: number | null, max: number | null) => {
+    if (valueChipActive(min, max)) {
+      setValueMin(null);
+      setValueMax(null);
+    } else {
+      setValueMin(min);
+      setValueMax(max);
+    }
+  };
+  const parseMoney = (raw: string): number | null => {
+    if (raw.trim() === "") return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setStages(null);
+    setValueMin(null);
+    setValueMax(null);
+    setAgeBuckets(new Set());
+  };
+
+  // Sortable column header.
+  const SortTh = ({ label, k, className = "" }: { label: string; k: SortKey; className?: string }) => {
+    const active = sortKey === k;
+    return (
+      <th className={`py-2 ${className}`}>
+        <button
+          type="button"
+          onClick={() => onSort(k)}
+          aria-label={`Sort by ${label}`}
+          className={`microlabel inline-flex items-center gap-1 font-semibold transition-colors hover:text-accent ${active ? "text-ink" : ""}`}
+        >
+          {label}
+          {active && <span aria-hidden>{sortDir === "asc" ? "▲" : "▼"}</span>}
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div className="border border-rule bg-panel shadow-card">
-      <div className="flex justify-end border-b border-rule px-5 py-3">
+      {/* toolbar: search + result count */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-5 py-3">
+        <div className="relative min-w-[14rem] flex-1">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint">
+            <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <circle cx="7" cy="7" r="4.5" />
+              <path d="M10.5 10.5 14 14" strokeLinecap="round" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search deals…"
+            aria-label="Search open deals by name"
+            className="w-full border border-rule bg-paper py-1.5 pl-8 pr-8 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <p className="font-mono text-[11px] text-ink-faint">
-          {open.length} open · {fmtMoney(total, { compact: true })}
+          Showing {filtered.length} of {open.length} deals · {fmtMoney(filteredValue, { compact: true })}
         </p>
       </div>
+
+      {/* filter bar: stage · value · age — stacks on mobile, single row from sm up */}
+      <div className="flex flex-col gap-3 border-b border-rule px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
+        {/* stage multi-select */}
+        <span ref={stagePop.ref} className="relative inline-block">
+          <button
+            type="button"
+            aria-expanded={stagePop.open}
+            onClick={() => stagePop.setOpen(!stagePop.open)}
+            className={`${FILTER_CTRL} inline-flex items-center gap-1.5`}
+          >
+            Stage
+            {!stagesAreAll && (
+              <span className="bg-accent-soft px-1 font-mono text-[10px] text-accent">{effectiveStages.size}</span>
+            )}
+            <span aria-hidden className="text-ink-faint">▾</span>
+          </button>
+          {stagePop.open && (
+            <span className="absolute left-0 top-full z-40 mt-1 block w-52 border border-rule-dark bg-panel p-2 shadow-pop">
+              {stageOptions.map((label) => (
+                <label
+                  key={label}
+                  className="flex cursor-pointer items-center gap-2 px-1 py-1 text-xs text-ink-soft hover:text-ink"
+                >
+                  <input
+                    type="checkbox"
+                    checked={effectiveStages.has(label)}
+                    onChange={() => toggleStage(label)}
+                    className="accent-accent"
+                  />
+                  {label}
+                </label>
+              ))}
+            </span>
+          )}
+        </span>
+
+        {/* value range */}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="microlabel">Value</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={valueMin ?? ""}
+            onChange={(e) => setValueMin(parseMoney(e.target.value))}
+            placeholder="Min"
+            aria-label="Minimum deal value"
+            className={`${FILTER_CTRL} w-20 font-mono`}
+          />
+          <span className="text-ink-faint">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={valueMax ?? ""}
+            onChange={(e) => setValueMax(parseMoney(e.target.value))}
+            placeholder="Max"
+            aria-label="Maximum deal value"
+            className={`${FILTER_CTRL} w-20 font-mono`}
+          />
+          {VALUE_CHIPS.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => onValueChip(c.min, c.max)}
+              aria-pressed={valueChipActive(c.min, c.max)}
+              className={`border px-2 py-1 text-xs transition-colors ${
+                valueChipActive(c.min, c.max)
+                  ? "border-accent bg-accent-soft text-accent"
+                  : "border-rule bg-paper text-ink-soft hover:border-rule-dark"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </span>
+
+        {/* age buckets */}
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="microlabel">Age</span>
+          {AGE_BUCKETS.map((b) => {
+            const on = ageBuckets.has(b.key);
+            return (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => toggleAge(b.key)}
+                aria-pressed={on}
+                className={`border px-2 py-1 text-xs transition-colors ${
+                  on
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-rule bg-paper text-ink-soft hover:border-rule-dark"
+                }`}
+              >
+                {b.label}
+              </button>
+            );
+          })}
+        </span>
+      </div>
+
+      {/* active filter pills */}
+      {anyFilter && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-rule px-5 py-2.5">
+          {!stagesAreAll &&
+            [...effectiveStages].map((label) => (
+              <Pill key={`stage-${label}`} onRemove={() => removeStage(label)}>
+                <span className="text-ink-faint">stage:</span> {label}
+              </Pill>
+            ))}
+          {valueActive && (
+            <Pill
+              onRemove={() => {
+                setValueMin(null);
+                setValueMax(null);
+              }}
+            >
+              <span className="text-ink-faint">value:</span> {valueRangeLabel(valueMin, valueMax)}
+            </Pill>
+          )}
+          {AGE_BUCKETS.filter((b) => ageBuckets.has(b.key)).map((b) => (
+            <Pill key={`age-${b.key}`} onRemove={() => toggleAge(b.key)}>
+              <span className="text-ink-faint">age:</span> {b.label}
+            </Pill>
+          ))}
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="ml-auto text-xs font-semibold text-accent hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full min-w-[36rem] text-sm">
           <thead>
             <tr className="border-b border-rule text-left">
-              <th className="microlabel px-5 py-2 font-semibold">Deal</th>
-              <th className="microlabel px-3 py-2 font-semibold">Stage now</th>
-              <th className="microlabel px-3 py-2 text-right font-semibold">Value</th>
-              <th className="microlabel px-3 py-2 font-semibold">Created</th>
-              <th className="microlabel px-3 py-2 font-semibold">Age</th>
+              <SortTh label="Deal" k="name" className="px-5" />
+              <SortTh label="Stage now" k="stage" className="px-3" />
+              <th className="px-3 py-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => onSort("value")}
+                  aria-label="Sort by Value"
+                  className={`microlabel inline-flex items-center gap-1 font-semibold transition-colors hover:text-accent ${sortKey === "value" ? "text-ink" : ""}`}
+                >
+                  Value
+                  {sortKey === "value" && <span aria-hidden>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                </button>
+              </th>
+              <SortTh label="Created" k="created" className="px-3" />
+              <SortTh label="Age" k="age" className="px-3" />
               <th className="px-5 py-2" />
             </tr>
           </thead>
           <tbody>
-            {visible.map((d) => (
-              <tr key={d.id} className="border-b border-rule/60 last:border-0 hover:bg-paper">
-                <td className="max-w-[18rem] truncate px-5 py-2 font-medium">{d.name}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-soft">{d.stageLabel}</td>
-                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs">
-                  {fmtMoney(d.value, { compact: true })}
-                  {d.amount === null && (
-                    <span className="ml-1 text-[9px] uppercase text-ink-faint" title="No amount set — $50K default">
-                      est
-                    </span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{fmtDate(d.createdAt)}</td>
-                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{daysAgo(d.createdAt, now)}</td>
-                <td className="whitespace-nowrap px-5 py-2 text-right">
-                  <a
-                    href={d.hubspotUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-xs text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-12 text-center">
+                  <p className="text-sm text-ink-soft">No deals match these filters</p>
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="mt-3 border border-rule px-3 py-1.5 text-xs font-semibold text-accent hover:bg-paper"
                   >
-                    HubSpot ↗
-                  </a>
+                    Clear filters
+                  </button>
                 </td>
               </tr>
-            ))}
+            ) : (
+              visible.map((d) => (
+                <tr
+                  key={d.id}
+                  onClick={() => setSelected(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelected(d);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`View ${d.name}`}
+                  className="cursor-pointer border-b border-rule/60 last:border-0 hover:bg-paper focus-visible:bg-paper focus-visible:outline-none"
+                >
+                  <td className="max-w-[18rem] truncate px-5 py-2 font-medium">{d.name}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-soft">{d.stageLabel}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs">
+                    {fmtMoney(d.value, { compact: true })}
+                    {d.amount === null && (
+                      <span className="ml-1 text-[9px] uppercase text-ink-faint" title="No amount set — $50K default">
+                        est
+                      </span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{fmtDate(d.createdAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{daysAgo(d.createdAt, now)}</td>
+                  <td className="whitespace-nowrap px-5 py-2 text-right">
+                    <a
+                      href={d.hubspotUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-mono text-xs text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+                    >
+                      HubSpot ↗
+                    </a>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-      {open.length > 12 && (
+
+      {filtered.length > 12 && (
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
           className="w-full border-t border-rule px-5 py-2.5 text-xs font-semibold text-accent hover:bg-paper"
         >
-          {showAll ? "Show top 12" : `Show all ${open.length} open deals`}
+          {showAll ? "Show top 12" : `Show all ${filtered.length} open deals`}
         </button>
       )}
+
+      {selected && <OpenDealDrawer deal={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

@@ -61,3 +61,38 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: the scrollspy band sits just under the nav
   (`-navH px` top margin); sections report via a `hit` map and "last intersecting in DOM
   order" wins; in the 40px gaps between sections it deliberately keeps the previous name.
+
+### 2026-06-10 · Open Deals table sort/filter/search/drawer (main)
+
+- **Touched**: new `src/lib/openDeals.ts` (pure `filterOpenDeals`/`sortOpenDeals`,
+  `ageDays`, `AGE_BUCKETS`, `VALUE_CHIPS`, `DEFAULT_SORT_DIR`), new
+  `src/components/OpenDealDrawer.tsx` (right-side detail drawer), `Revenue.tsx` (rewrote the
+  `OpenDeals` export: debounced search, sortable headers, stage/value/age filter bar with
+  removable pills, "Showing N of M" count, empty state, row→drawer), `Metric.tsx` (exported
+  the previously-private `usePop` hook to reuse for the stage dropdown).
+- **Decisions**: the drawer's owner / last-activity / next-step fields don't exist on `Deal`
+  and the brief said don't touch the data layer — owner shows **"Not synced yet"** placeholders
+  (clean seam for a later associations/owners-API follow-up). Search matches deal name only
+  (no separate account field; the account is embedded in the name). Live portal has exactly
+  **52 open deals** and real "Robinhood …" records, so the search test hit real data.
+- **Surprises**: (1) Hit the documented `.rise` stacking-context trap again — the drawer was
+  rendered *inside* the `.rise` `<Section>`, so its `z-50` was scoped within the section and
+  the sticky header (`z-30`, top level) painted over the drawer's top (deal name + close
+  button were hidden). `Drilldown` dodges this by rendering at the top level of `Dashboard`.
+  Fix: `createPortal(panel, document.body)` so the overlay escapes any ancestor stacking
+  context (React context still flows through portals, so `useDash()` keeps working). For any
+  *new* overlay nested inside a section, portal to body — don't fight z-index. (2) `createPortal`
+  threw `Target container is not a DOM element` exactly once, and the stack was entirely inside
+  React Fast Refresh (`performReactRefresh`/`applyUpdate`) — an HMR-only artifact from editing
+  the file while the drawer was mounted. The standard `const [mounted,setMounted]=useState(false);
+  useEffect(()=>setMounted(true),[]); if(!mounted) return null;` guard before the portal kills it.
+  (3) Filter-bar control groups built as `inline-flex` (Value: label+Min+Max+3 chips) don't wrap
+  and blew past 390px → whole-page horizontal scroll. Make the bar `flex-col … sm:flex-row
+  sm:flex-wrap` and each group `flex flex-wrap` so chips drop to a second line on mobile;
+  desktop is unchanged. The table itself keeps `min-w-[36rem]` inside `overflow-x-auto` — that
+  horizontal scroll is intentional and contained, not page overflow.
+- **Tip for future-you**: `usePop`'s ref is typed `HTMLSpanElement`, so the dropdown wrapper
+  must be a `<span className="relative inline-block">` (like `InfoTip`), not a `<div>`.
+  `format.ts` `daysAgo()` returns a *string* ("840 days") — for buckets/sorting use the new
+  numeric `ageDays()` in `openDeals.ts`. The stage filter treats "every present stage selected"
+  as no-op (not set-size), so it's robust to stale labels; `null` state = "all".

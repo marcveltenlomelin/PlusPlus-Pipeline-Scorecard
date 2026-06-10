@@ -190,23 +190,13 @@ export default function Scoreboard(p: ScoreboardProps) {
   };
 
   return (
-    <section aria-label={`Throughput ${phrase}`}>
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-base font-bold tracking-tight">
-          Stage entries <span className="text-ink-faint">— {phrase}, actual of goal</span>
-        </h2>
-        <p className="hidden text-[11px] text-ink-faint sm:block">
-          counts deals that <em>entered</em> each stage in the period · final once the period closes
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {card("sal")}
-        {card("sql")}
-        {card("deepdive")}
-        {pilotCard()}
-        {card("won", fmtMoney(won.totalValue, { compact: true }))}
-        {card("lost")}
-      </div>
-    </section>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      {card("sal")}
+      {card("sql")}
+      {card("deepdive")}
+      {pilotCard()}
+      {card("won", fmtMoney(won.totalValue, { compact: true }))}
+      {card("lost")}
+    </div>
   );
 }

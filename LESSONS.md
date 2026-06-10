@@ -41,3 +41,23 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: the bar's "Expected today" label hides the "Goal" label when
   the expected marker passes 82% of the track — they'd collide at end of period and say
   nearly the same number anyway.
+
+### 2026-06-10 · Section rhythm + scroll-aware nav indicator (main)
+
+- **Touched**: `Dashboard.tsx` (new `Section` wrapper, IntersectionObserver scrollspy),
+  `Header.tsx` (sticky from `md:` up, section indicator next to the period nav),
+  `Revenue.tsx` (split into `Revenue` / `OpenDeals` / `RevenueMath` exports so all seven
+  sections are top-level), `Scoreboard/FunnelTrend/Pace/Funnel` (own `<h2>` rows removed —
+  the wrapper owns the `<section>`).
+- **Surprises**: (1) A pure thin-band scrollspy can never activate the *last* section —
+  a short tail section's header physically can't scroll up to the band; a second
+  IntersectionObserver on the footer (threshold ≈ 1) as an end-of-page sentinel fixes it
+  without scroll listeners. (2) `rootMargin` percentages are relative to viewport height —
+  on a 390px-tall... wide phone the math went negative; compute the bottom margin in px
+  from `window.innerHeight` and the *measured* header height instead. (3) A sticky header
+  that wraps to ~240px on mobile eats a quarter of the viewport — `md:sticky` only.
+  (4) JSX comments (`{/* */}`) are invalid directly inside `return (` before the root
+  element — use a `//` line comment there.
+- **Tip for future-you**: the scrollspy band sits just under the nav
+  (`-navH px` top margin); sections report via a `hit` map and "last intersecting in DOM
+  order" wins; in the 40px gaps between sections it deliberately keeps the previous name.

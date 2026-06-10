@@ -91,15 +91,10 @@ export default function FunnelTrend(p: FunnelTrendProps) {
   };
 
   return (
-    <section aria-label="Funnel trend by stage">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-base font-bold tracking-tight">
-          Funnel trend <span className="text-ink-faint">— last {n} {p.granularity}s, entries per stage</span>
-        </h2>
-        <p className="hidden text-[11px] text-ink-faint sm:block">
-          click a stage to focus · click a point to see its deals
-        </p>
-      </div>
+    <div>
+      <p className="mb-2 hidden text-right text-[11px] text-ink-faint sm:block">
+        last {n} {p.granularity}s · click a stage to focus · click a point to see its deals
+      </p>
 
       <div className="border border-rule bg-panel p-4 shadow-card sm:p-5">
         {/* per-stage direction strip — doubles as a series toggle */}
@@ -248,6 +243,6 @@ export default function FunnelTrend(p: FunnelTrendProps) {
           compare the last two completed {p.granularity}s
         </p>
       </div>
-    </section>
+    </div>
   );
 }

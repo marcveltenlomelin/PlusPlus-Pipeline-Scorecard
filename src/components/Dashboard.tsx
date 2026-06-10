@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { STAGE_GOALS } from "@/lib/config";
-import { periodKey } from "@/lib/periods";
+import { periodKey, periodPhrase } from "@/lib/periods";
 import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
@@ -10,8 +10,34 @@ import Funnel from "./Funnel";
 import FunnelTrend from "./FunnelTrend";
 import Header from "./Header";
 import Pace from "./Pace";
-import Revenue from "./Revenue";
+import Revenue, { OpenDeals, RevenueMath } from "./Revenue";
 import Scoreboard from "./Scoreboard";
+
+/** Uniform chapter treatment: hairline rule, 64px of air, uppercase header, plain-English subtitle. */
+function Section({
+  title,
+  subtitle,
+  delay,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  delay: number;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      data-section={title}
+      aria-label={title}
+      className="rise border-t border-rule pt-16"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <h2 className="text-sm font-bold uppercase tracking-[0.05em] text-ink-soft">{title}</h2>
+      <p className="mt-1 text-xs text-ink-faint">{subtitle}</p>
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
 
 type Payload = DealsPayload & { pilotStageId: string | null };
 
@@ -34,6 +60,55 @@ export default function Dashboard() {
   const [drill, setDrill] = useState<DrillSpec | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  // Scroll-aware nav indicator: a section is "current" while it overlaps a thin
+  // band just under the sticky nav. IntersectionObserver only — no scroll listeners.
+  useEffect(() => {
+    if (!payload) return;
+    const els = Array.from(document.querySelectorAll<HTMLElement>("main [data-section]"));
+    if (els.length === 0) return;
+    const navH = (document.querySelector("header")?.offsetHeight ?? 72) + 1;
+    const bandBottom = Math.max(window.innerHeight - navH - 12, 0);
+    const hit = new Map(els.map((el) => [el.dataset.section as string, false]));
+    let atEnd = false; // the last section's header can never reach the band — the footer stands in for it
+    const recompute = () => {
+      if (atEnd) {
+        setActiveSection(els[els.length - 1].dataset.section as string);
+        return;
+      }
+      const passed = els.filter((el) => hit.get(el.dataset.section as string));
+      if (passed.length > 0) {
+        setActiveSection(passed[passed.length - 1].dataset.section as string);
+      } else if (els[0].getBoundingClientRect().top > navH) {
+        setActiveSection(null); // back above the first section header
+      }
+      // in the gaps between sections, keep the last section's name
+    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) hit.set((e.target as HTMLElement).dataset.section as string, e.isIntersecting);
+        recompute();
+      },
+      { rootMargin: `-${navH}px 0px -${bandBottom}px 0px`, threshold: 0 }
+    );
+    els.forEach((el) => observer.observe(el));
+    const footer = document.querySelector("main footer");
+    const endObserver = footer
+      ? new IntersectionObserver(
+          (entries) => {
+            atEnd = entries[entries.length - 1].intersectionRatio >= 0.99;
+            recompute();
+          },
+          { threshold: [0.99] }
+        )
+      : null;
+    if (footer && endObserver) endObserver.observe(footer);
+    return () => {
+      observer.disconnect();
+      endObserver?.disconnect();
+    };
+  }, [payload]);
 
   const load = useCallback(async (refresh: boolean) => {
     setRefreshing(true);
@@ -111,6 +186,8 @@ export default function Dashboard() {
     void patchStore({ goals: { [stage]: { ...STAGE_GOALS[stage] } } });
   };
 
+  const phrase = periodPhrase(period, now);
+
   if (!mounted) {
     return (
       <div className="grid min-h-screen place-items-center text-sm text-ink-faint" role="status">
@@ -130,6 +207,7 @@ export default function Dashboard() {
         period={period}
         now={now}
         payload={payload}
+        section={activeSection}
         refreshing={refreshing}
         onGranularity={onGranularity}
         onPeriod={setPeriod}
@@ -164,7 +242,11 @@ export default function Dashboard() {
 
         {payload && (
           <>
-            <div className="rise" style={{ animationDelay: "0ms" }}>
+            <Section
+              title="Stage Entries"
+              subtitle={`Deals that entered each stage ${phrase} — actual against goal, not board occupancy.`}
+              delay={0}
+            >
               <Scoreboard
                 deals={payload.deals}
                 period={period}
@@ -175,8 +257,12 @@ export default function Dashboard() {
                 onGoalSave={onGoalSave}
                 onGoalReset={onGoalReset}
               />
-            </div>
-            <div className="rise" style={{ animationDelay: "60ms" }}>
+            </Section>
+            <Section
+              title="Funnel Trend"
+              subtitle={`How many deals hit each stage, ${granularity} by ${granularity}.`}
+              delay={60}
+            >
               <FunnelTrend
                 deals={payload.deals}
                 granularity={granularity}
@@ -184,8 +270,12 @@ export default function Dashboard() {
                 pilotTracked={payload.pilotTracked}
                 goalFor={goalFor}
               />
-            </div>
-            <div className="rise" style={{ animationDelay: "120ms" }}>
+            </Section>
+            <Section
+              title="Pace to Goal"
+              subtitle={`Are SALs and Net New Opps on pace for ${phrase}?`}
+              delay={120}
+            >
               <Pace
                 deals={payload.deals}
                 period={period}
@@ -194,13 +284,35 @@ export default function Dashboard() {
                 onGoalSave={onGoalSave}
                 onGoalReset={onGoalReset}
               />
-            </div>
-            <div className="rise" style={{ animationDelay: "180ms" }}>
+            </Section>
+            <Section
+              title="Funnel Leaks"
+              subtitle="Where deals stall — stage-to-stage conversion over the trailing 90 days."
+              delay={180}
+            >
               <Funnel deals={payload.deals} pilotTracked={payload.pilotTracked} />
-            </div>
-            <div className="rise" style={{ animationDelay: "240ms" }}>
+            </Section>
+            <Section
+              title="Revenue"
+              subtitle="Dollars created and closed against the $1.2M net-new ARR target."
+              delay={240}
+            >
               <Revenue deals={payload.deals} period={period} granularity={granularity} />
-            </div>
+            </Section>
+            <Section
+              title="Open Deals"
+              subtitle="Every open deal on the board, biggest first — the audit trail behind the numbers."
+              delay={300}
+            >
+              <OpenDeals deals={payload.deals} />
+            </Section>
+            <Section
+              title="Revenue Math"
+              subtitle="The bottom line: closed-won run rate × average deal size, straight-lined to Dec 31."
+              delay={360}
+            >
+              <RevenueMath deals={payload.deals} />
+            </Section>
 
             <footer className="border-t border-rule pt-5 text-[11px] leading-relaxed text-ink-faint">
               <p className="max-w-3xl">

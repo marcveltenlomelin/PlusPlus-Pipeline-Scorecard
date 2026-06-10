@@ -192,11 +192,7 @@ export default function Pace(p: PaceProps) {
   const nno = enteredInPeriod(p.deals, "sql", p.period);
 
   return (
-    <section aria-label="Pace to goal">
-      <h2 className="mb-3 font-display text-base font-bold tracking-tight">
-        Pace to goal <span className="text-ink-faint">— {phrase}</span>
-      </h2>
-      <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-3 md:grid-cols-2">
         <PaceCard
           title="SALs created"
           stageKey="sal"
@@ -237,7 +233,6 @@ export default function Pace(p: PaceProps) {
             })
           }
         />
-      </div>
-    </section>
+    </div>
   );
 }

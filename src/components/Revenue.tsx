@@ -80,14 +80,7 @@ export default function Revenue(p: RevenueProps) {
   const money = (n: number) => fmtMoney(n, { compact: true });
 
   return (
-    <section aria-label="Revenue">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-base font-bold tracking-tight">
-          Revenue <span className="text-ink-faint">— against $1.2M net-new ARR</span>
-        </h2>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Tile
           label={`Pipeline created · ${phrase}`}
           def={DEFINITIONS["rev:pipeline"]}
@@ -181,27 +174,16 @@ export default function Revenue(p: RevenueProps) {
         >
           <Metric id={`rev:projArr:${year}`} live={projected} format={money} />
         </Tile>
-      </div>
-
-      <OpenDealsTable deals={p.deals} now={now} />
-
-      <RevenueMath wonCount={wonYtd.count} year={year} yearStart={yearStart} now={now} />
-    </section>
+    </div>
   );
 }
 
 /** The bottom line: projected closed-won deals × $50K vs the $1.2M target. */
-function RevenueMath({
-  wonCount,
-  year,
-  yearStart,
-  now,
-}: {
-  wonCount: number;
-  year: number;
-  yearStart: number;
-  now: number;
-}) {
+export function RevenueMath({ deals }: { deals: Deal[] }) {
+  const { now } = useDash();
+  const year = new Date(now).getFullYear();
+  const yearStart = new Date(year, 0, 1).getTime();
+  const wonCount = valueEnteredBetween(deals, "won", yearStart, now).count;
   const yearEnd = new Date(year + 1, 0, 1).getTime();
   const elapsed = Math.min(1, Math.max(0.0001, (now - yearStart) / (yearEnd - yearStart)));
   const projectedWins = wonCount / elapsed; // straight-line to Dec 31
@@ -216,7 +198,7 @@ function RevenueMath({
         : { chip: "bg-bad-soft text-bad", label: "behind" };
 
   return (
-    <div className="mt-3 border border-rule-dark bg-panel px-5 py-4 shadow-card">
+    <div className="border border-rule-dark bg-panel px-5 py-4 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex items-center gap-2">
           <h3 className="microlabel">Revenue math · {year}</h3>
@@ -242,18 +224,16 @@ function RevenueMath({
   );
 }
 
-function OpenDealsTable({ deals, now }: { deals: Deal[]; now: number }) {
+export function OpenDeals({ deals }: { deals: Deal[] }) {
+  const { now } = useDash();
   const [showAll, setShowAll] = useState(false);
   const open = deals.filter((d) => d.isOpen).sort((a, b) => b.value - a.value);
   const visible = showAll ? open : open.slice(0, 12);
   const total = open.reduce((s, d) => s + d.value, 0);
 
   return (
-    <div className="mt-3 border border-rule bg-panel shadow-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-5 py-3">
-        <h3 className="font-display text-sm font-bold tracking-tight">
-          Open deals <span className="font-normal text-ink-faint">— live from the board, for drill-down</span>
-        </h3>
+    <div className="border border-rule bg-panel shadow-card">
+      <div className="flex justify-end border-b border-rule px-5 py-3">
         <p className="font-mono text-[11px] text-ink-faint">
           {open.length} open · {fmtMoney(total, { compact: true })}
         </p>

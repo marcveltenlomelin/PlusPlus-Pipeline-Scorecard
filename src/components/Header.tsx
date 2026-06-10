@@ -104,6 +104,8 @@ interface HeaderProps {
   period: string;
   now: number;
   payload: DealsPayload | null;
+  /** Name of the section whose header has scrolled under the nav, if any. */
+  section?: string | null;
   refreshing: boolean;
   onGranularity: (g: Granularity) => void;
   onPeriod: (key: string) => void;
@@ -113,7 +115,8 @@ interface HeaderProps {
 export default function Header(p: HeaderProps) {
   const current = isCurrentPeriod(p.period, p.now);
   return (
-    <header className="border-b-2 border-ink">
+    // sticky from md up only — the wrapped mobile header would eat a quarter of the viewport
+    <header className="top-0 z-30 border-b-2 border-ink bg-paper md:sticky">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-end gap-x-5 gap-y-3 px-5 py-4 sm:px-8">
         <div className="mr-auto flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -173,6 +176,15 @@ export default function Header(p: HeaderProps) {
             >
               Today
             </button>
+          )}
+          {p.section && (
+            <span
+              key={p.section}
+              aria-live="polite"
+              className="rise ml-2 whitespace-nowrap border-l border-rule-dark pl-3 text-[10px] font-bold uppercase tracking-wider text-ink-soft"
+            >
+              {p.section}
+            </span>
           )}
         </div>
 

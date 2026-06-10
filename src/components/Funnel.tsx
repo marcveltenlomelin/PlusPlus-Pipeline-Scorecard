@@ -41,14 +41,7 @@ export default function Funnel(p: FunnelProps) {
     });
 
   return (
-    <section aria-label="Funnel conversion and close rate">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-base font-bold tracking-tight">
-          Where the funnel leaks <span className="text-ink-faint">— trailing {TRAILING_WINDOW_DAYS} days</span>
-        </h2>
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-[1fr_minmax(16rem,0.35fr)]">
+    <div className="grid gap-3 lg:grid-cols-[1fr_minmax(16rem,0.35fr)]">
         {/* stage-to-stage conversion */}
         <div className="flex flex-col justify-between gap-2 border border-rule bg-panel p-5 shadow-card sm:flex-row sm:items-center">
           {STEPS.map((step, i) => {
@@ -159,7 +152,6 @@ export default function Funnel(p: FunnelProps) {
             </button>
           </p>
         </div>
-      </div>
-    </section>
+    </div>
   );
 }

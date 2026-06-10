@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
 import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
+import { headlineWindows } from "@/lib/headline";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
 import Funnel from "./Funnel";
+import Headline from "./Headline";
 import FunnelTrend from "./FunnelTrend";
 import Header from "./Header";
 import Pace from "./Pace";
@@ -296,6 +298,17 @@ export default function Dashboard() {
               syncing={syncing}
               onRefresh={() => void load(true)}
             />
+            <Section
+              title={`Headline · ${headlineWindows(now, granularity).label}`}
+              subtitle="The business in one line — win rate, cycle time, and deal size, with the prior window for contrast."
+              delay={0}
+              loading={syncing}
+              skeleton="cards"
+              error={syncError}
+              onRetry={() => void load(true)}
+            >
+              <Headline deals={payload.deals} granularity={granularity} />
+            </Section>
             <Section
               title="Stage Entries"
               subtitle={`Deals that entered each stage ${phrase} — actual against goal, not board occupancy.`}

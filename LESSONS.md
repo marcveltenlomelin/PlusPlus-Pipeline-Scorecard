@@ -210,3 +210,26 @@ what to do next time. Read this file before starting any new task.
   reuse `computeFocusActions` server-side. Score scales: stale saturates at $50K×365days;
   pacing/conversion are shortfall ratios ×100; revival is value/$100K (+20% if lost ≤30d);
   goal milestones are ×0.6-weighted (momentum, not urgency). Tune there, not in the JSX.
+
+### 2026-06-10 · Headline KPIs (main)
+
+- **Touched**: new `src/lib/headline.ts` (`headlineWindows`, interpolating `quantile`,
+  `headlineKpis` — windowed win rate / cycle median+P25–P75 / deal-size mean+median, each
+  with a prior-window value), new `src/lib/headline.test.ts` (7 tests), new
+  `src/components/Headline.tsx` (three tiles mirroring StageCard anatomy), one `Section`
+  insert in `Dashboard.tsx` between Today's Focus and Stage Entries (standard
+  loading/error wiring → sync skeletons and failure chips came free; scrollspy registered
+  automatically via `data-section`).
+- **Decisions**: T12M windows use calendar-month arithmetic (`new Date(y, m−12, d)`), not
+  365×day. YEAR view compares YTD to the *same span* of the prior year (Jan 1 → same
+  date), not the full prior year. Cycle delta colors are inverted (shorter = green).
+  Win-rate delta is in percentage points. Every tooltip embeds the literal date range.
+- **Surprises**: (1) Live T12M data is brutal and exercised every empty path naturally:
+  0 won · 26 lost → 0% win rate, cycle "N/A — needs a first closed-won", deal size "—".
+  The designed empty states were the *primary* states, not edge cases — worth designing
+  them first on this portal. (2) Prior-window (Jun 2024–Jun 2025) has zero closes, so all
+  deltas read "— vs prior" — `hs_v2_date_entered_closedlost` coverage evidently starts
+  later than deal history. (3) `data-section^="Headline"` prefix selectors keep Playwright
+  checks stable while the title swaps between "Trailing 12 Months" and "2026 YTD".
+- **Tip for future-you**: `headlineKpis` is window-agnostic — feed it any `{start,end}`
+  pair (quarterly board reviews, cohort comparisons) without touching the math.

@@ -98,3 +98,29 @@ what to do next time. Read this file before starting any new task.
   `format.ts` `daysAgo()` returns a *string* ("840 days") — for buckets/sorting use the new
   numeric `ageDays()` in `openDeals.ts`. The stage filter treats "every present stage selected"
   as no-op (not set-size), so it's robust to stale labels; `null` state = "all".
+
+### 2026-06-10 · Close rate empty-state clarity (main)
+
+- **Touched**: `Metric.tsx` (new shared `EMPTY_TRACK` style const, precedent `POP_PANEL`),
+  `Funnel.tsx` (close-rate card: null-rate headline message + empty-bar variant with overlay
+  text), `Revenue.tsx` (`Tile` bar at $0), `Pace.tsx` (bar at actual 0).
+- **Decisions**: the app has exactly **3** progress-fill bars (grep `width:` styles) — close
+  rate, Revenue tiles, Pace cards; Recharts charts are data charts, not gauges, and were
+  deliberately excluded from the empty-state treatment. The requested ⓘ tooltip already
+  existed (`DEFINITIONS.closeRate` wired at the card header) — no change. `closeRate()`
+  already separates the two empty cases: `rate 0` (losses, no wins) vs `rate null` (nothing
+  closed). The headline only becomes the "No closed deals…" message when the *resolved*
+  (override-aware) value is null, so a manual close-rate override still renders normally.
+- **Surprises**: (1) The live portal data exactly matched the spec's example — 0 won / 2
+  lost in the trailing 90 days → "0 won of 2 attempted". Real data covered the 0% case; the
+  null case can't occur live, so it was verified by temporarily forcing
+  `Object.assign(cr, {rate:null,…})` in the component, screenshotting, and reverting before
+  commit (screenshot kept as `close-rate-after-empty-90d.png`). (2) A natural Pace zero
+  exists at **week** granularity (NNO 0/1.4) — switch granularity before hunting for forced
+  states. (3) Overlay text inside an empty track needs `bg-panel px-1.5` on the label so the
+  50% target marker doesn't strike through it; keep the marker `-top-1 -bottom-1` so it
+  still reads as crossing the full track.
+- **Tip for future-you**: any new progress bar should use `EMPTY_TRACK` for its zero state
+  (dashed faint outline = deliberately empty, not broken). The close-rate empty bar is `h-6`
+  (vs `h-3` filled) specifically to host the overlay text — states swap rarely, so the
+  height jump is a non-issue.

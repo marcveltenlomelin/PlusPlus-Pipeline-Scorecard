@@ -6,7 +6,7 @@ import { enteredInPeriod, pace, pacingBadge, type PacingState } from "@/lib/metr
 import { dayOfPeriod, granularityOf, isCurrentPeriod, periodPhrase } from "@/lib/periods";
 import type { Deal, GoalStage, Granularity, StageKey } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
-import { InfoTip, Metric, PaceBadge, POP_PANEL } from "./Metric";
+import { EMPTY_TRACK, InfoTip, Metric, PaceBadge, POP_PANEL } from "./Metric";
 import { defaultGoal } from "./Scoreboard";
 
 interface PaceProps {
@@ -133,7 +133,7 @@ function PaceCard({
           )}
         </div>
 
-        <div className="relative h-7 w-full bg-ink/10">
+        <div className={`relative h-7 w-full ${m.actual <= 0 ? EMPTY_TRACK : "bg-ink/10"}`}>
           <div
             className={`flex h-full items-center justify-end ${fill.bar} transition-[width] duration-500`}
             style={{ width: `${fillPct}%` }}

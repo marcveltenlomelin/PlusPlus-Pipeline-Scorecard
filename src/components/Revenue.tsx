@@ -23,7 +23,7 @@ import {
 import { periodPhrase } from "@/lib/periods";
 import type { Deal, Granularity } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
-import { InfoTip, Metric, usePop } from "./Metric";
+import { EMPTY_TRACK, InfoTip, Metric, usePop } from "./Metric";
 import OpenDealDrawer from "./OpenDealDrawer";
 
 interface RevenueProps {
@@ -55,12 +55,17 @@ function Tile({
       </div>
       <p className="mt-2 text-[1.7rem] leading-none font-bold tracking-tight">{children}</p>
       {bar && (
-        <div className="mt-3 h-2 bg-paper outline outline-1 outline-rule-dark" role="img"
-          aria-label={`${fmtMoney(bar.value, { compact: true })} of ${fmtMoney(bar.target, { compact: true })}`}>
-          <div
-            className={`h-full ${bar.value >= bar.target ? "bg-good" : "bg-accent"}`}
-            style={{ width: `${Math.min(100, (bar.value / bar.target) * 100)}%` }}
-          />
+        <div
+          className={`mt-3 h-2 ${bar.value <= 0 ? EMPTY_TRACK : "bg-paper outline outline-1 outline-rule-dark"}`}
+          role="img"
+          aria-label={`${fmtMoney(bar.value, { compact: true })} of ${fmtMoney(bar.target, { compact: true })}`}
+        >
+          {bar.value > 0 && (
+            <div
+              className={`h-full ${bar.value >= bar.target ? "bg-good" : "bg-accent"}`}
+              style={{ width: `${Math.min(100, (bar.value / bar.target) * 100)}%` }}
+            />
+          )}
         </div>
       )}
       {foot && <p className="mt-2 font-mono text-[11px] leading-relaxed text-ink-faint">{foot}</p>}

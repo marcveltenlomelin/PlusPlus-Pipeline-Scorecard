@@ -30,6 +30,9 @@ export function usePop() {
 export const POP_PANEL =
   "absolute left-1/2 top-full z-40 mt-2 block w-64 -translate-x-1/2 border border-rule-dark bg-panel p-3 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-ink-soft shadow-pop";
 
+/** Empty progress track: a deliberate "nothing yet" state, not a broken bar. */
+export const EMPTY_TRACK = "border border-dashed border-rule-dark bg-transparent";
+
 /** Small info popover — every number's definition, one keypress away. */
 export function InfoTip({ text, label }: { text: string; label?: string }) {
   const { open, setOpen, ref } = usePop();

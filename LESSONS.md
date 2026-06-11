@@ -506,3 +506,28 @@ what to do next time. Read this file before starting any new task.
   point-in-time conversion primitive — the snapshot `conversion()` in metrics.ts equals
   it at `asOf = now` except for the `<= now` guard; if they ever disagree, the trend
   chart and Funnel Leaks will visibly diverge at the rightmost point.
+
+### 2026-06-11 · YoY sparklines on stage cards (main)
+
+- **Touched**: new `src/lib/sparkline.ts` (`stageSparkline` — 13 monthly entry counts,
+  window clipped to the stage's first-ever entry with a "Since …" label, YoY pct null
+  when the prior month is zero), new `sparkline.test.ts` (5 tests), `Scoreboard.tsx`
+  (inline `Sparkline` subcomponent at the bottom of every `StageCard`; the demo-only
+  pilot-occupancy variant skips it).
+- **Decisions**: hand-rolled inline SVG bars instead of Recharts (13 rects × 6 cards
+  doesn't need ResponsiveContainers), and — the useful discovery — **CSS custom
+  properties work as inline-SVG fills** (`style={{ fill: "var(--color-good)" }}`), so
+  the sparklines carry zero duplicated hex constants, unlike the Recharts charts.
+  Current month = brand green (`--color-good`, same "brand" reading as Today's Focus);
+  muted months = `--color-rule-dark`; YoY pct tinted with FunnelTrend's `goodWhenUp`
+  semantics (Closed Lost flips).
+- **Surprises**: (1) Live June '25 had ZERO entries for every stage (the dormant year),
+  so every card's label reads "vs Jun '25 · 0 · —" — the zero-prior no-fake-percent
+  path is the primary live state, again. (2) A test fixture with history starting 3
+  months ago collided with the clipping rule by design (clipping kicks in before the
+  zero-prior case can) — zero-prior tests need history that PREDATES the window.
+  (3) All six cards land at exactly 248px — uniformity + grid stretch preserves
+  alignment without any height gymnastics.
+- **Tip for future-you**: `stageSparkline` clips only when the first entry falls
+  INSIDE the window (older history = full 13 months, however sparse). Empty months
+  render a 1.5px baseline stub so the rhythm of the window stays visible.

@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { DEFINITIONS, STAGE_GOALS, STAGE_LABELS } from "@/lib/config";
 import { fmtMoney, fmtNum } from "@/lib/format";
 import { enteredInPeriod, occupancy, pacingBadge } from "@/lib/metrics";
 import { periodPhrase, shiftPeriod } from "@/lib/periods";
+import { stageSparkline } from "@/lib/sparkline";
 import type { Deal, GoalStage, Granularity, StageKey } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
 import { InfoTip, Metric, PaceBadge } from "./Metric";
@@ -22,6 +24,72 @@ interface ScoreboardProps {
   goalFor: (stage: StageKey) => number | undefined;
   onGoalSave: (stage: GoalStage, perPeriodValue: number) => void;
   onGoalReset: (stage: GoalStage) => void;
+}
+
+/**
+ * 13-month YoY sparkline: thin bars (same month last year at the left edge,
+ * current month highlighted in brand green), with a "vs Jun '25 · 8 · −25%"
+ * comparison line. CSS variables work as inline-SVG fills, so the bars take
+ * theme tokens directly — no duplicated hex constants here.
+ */
+function Sparkline({ deals, stage, now, goodWhenUp }: { deals: Deal[]; stage: StageKey; now: number; goodWhenUp: boolean }) {
+  const s = useMemo(() => stageSparkline(deals, stage, now), [deals, stage, now]);
+  const max = Math.max(1, ...s.points.map((p) => p.count));
+  const n = s.points.length;
+  const H = 60;
+  const summary = `${STAGE_LABELS[stage]} entries, last ${n} months`;
+
+  let label: React.ReactNode;
+  if (s.since) {
+    label = <span>Since {s.since}</span>;
+  } else if (s.yoy) {
+    const cur = s.points[s.points.length - 1].count;
+    const pct = s.yoy.pct;
+    const good = pct === null || pct === 0 ? null : (pct > 0) === goodWhenUp;
+    label = (
+      <span>
+        vs {s.yoy.label} · {fmtNum(s.yoy.prior)} ·{" "}
+        {pct === null ? (
+          <span title={`No ${STAGE_LABELS[stage]} entries that month — no base for a percent`}>—</span>
+        ) : (
+          <span className={good === null ? "" : good ? "text-good" : "text-bad"} title={`${fmtNum(cur)} this month vs ${fmtNum(s.yoy.prior)} a year ago`}>
+            {pct > 0 ? "+" : "−"}
+            {Math.abs(Math.round(pct * 100))}%
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <div className="mt-3 border-t border-rule/60 pt-2">
+      <svg
+        viewBox={`0 0 ${n * 10} ${H}`}
+        preserveAspectRatio="none"
+        className="block h-[60px] w-full"
+        role="img"
+        aria-label={summary}
+      >
+        {s.points.map((p, i) => {
+          const h = p.count === 0 ? 1.5 : Math.max(3, (p.count / max) * (H - 4));
+          const isCurrent = i === n - 1;
+          return (
+            <rect
+              key={p.key}
+              x={i * 10 + 1.5}
+              y={H - h}
+              width={7}
+              height={h}
+              style={{ fill: isCurrent ? "var(--color-good)" : "var(--color-rule-dark)" }}
+            >
+              <title>{`${p.label} · ${p.count}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <p className="mt-1.5 font-mono text-[11px] leading-none text-ink-faint">{label}</p>
+    </div>
+  );
 }
 
 const DATE_LABEL: Partial<Record<StageKey, string>> = {
@@ -128,6 +196,7 @@ function StageCard({
           {delta > 0 ? `↑ ${delta}` : delta < 0 ? `↓ ${Math.abs(delta)}` : "—"} vs prior
         </span>
       </p>
+      <Sparkline deals={deals} stage={stage} now={now} goodWhenUp={stage !== "lost"} />
     </article>
   );
 }

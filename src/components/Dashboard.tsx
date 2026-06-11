@@ -7,6 +7,7 @@ import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/li
 import { headlineWindows } from "@/lib/headline";
 import { sdrOwnerOf, UNASSIGNED_ID } from "@/lib/owners";
 import { staleDeals } from "@/lib/stale";
+import ConversionTrend from "./ConversionTrend";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
 import Funnel from "./Funnel";
@@ -453,6 +454,17 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <Funnel deals={visibleDeals} pilotTracked={payload.pilotTracked} />
+            </Section>
+            <Section
+              title="Conversion Trends · Rolling 90-Day"
+              subtitle="Are the leaks getting better or worse — each transition's rolling-90-day rate, month by month."
+              delay={195}
+              loading={syncing}
+              skeleton="chart"
+              error={syncError}
+              onRetry={() => void load(true)}
+            >
+              <ConversionTrend deals={visibleDeals} pilotTracked={payload.pilotTracked} />
             </Section>
             <Section
               title="By SDR · Sourced Funnel"

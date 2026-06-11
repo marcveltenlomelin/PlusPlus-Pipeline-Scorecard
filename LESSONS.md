@@ -479,3 +479,30 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: `dealForecastWeight` is the single forecast lens — if Marc
   ever wants weighted versions of other $ metrics (e.g. By SDR pipe $), wrap the same
   fn; don't invent a second weighting.
+
+### 2026-06-11 · Conversion-rate trend chart (main)
+
+- **Touched**: new `src/lib/conversionTrend.ts` (`conversionAt`/`closeRateAt` —
+  rolling-90d windows evaluated point-in-time at each monthly marker;
+  `conversionTrendRows` builds flat Recharts rows with a nulled-when-low `Hi` variant +
+  `Meta` per series), new `conversionTrend.test.ts` (7 tests), new
+  `src/components/ConversionTrend.tsx` (FunnelTrend idiom: chip-strip toggle legend with
+  ▲/▼ vs last completed month, per-visible-series dashed target ReferenceLines, custom
+  mono tooltip with `n of d` + "low sample"), new Section in `Dashboard.tsx` after
+  Funnel Leaks (delay 195).
+- **Decisions**: point-in-time semantics — a conversion that happened in May does NOT
+  color February's marker (`entered[to] <= asOf`), so recent markers sit low while
+  cohorts mature (stated in the ⓘ). Low-sample (den<5) dimming via the dual-line trick:
+  dimmed dashed base line (all points, connectNulls) under a solid overlay whose
+  low-sample points are nulled — Recharts can't style line *segments* directly.
+- **Surprises**: (1) The left 8 months of the chart are legitimately EMPTY — the portal
+  created almost no deals Jul'25–Mar'26 (dormant stretch; activity resumed Apr 2026).
+  An honest empty region beats interpolation; don't "fix" it. (2) Synthetic
+  `dispatchEvent(MouseEvent)` does NOT trigger Recharts tooltips (it uses its own
+  pointer tracking) — use a real mouse via `browser_run_code_unsafe` + `page.mouse.move`
+  for tooltip assertions. (3) Newest-marker cross-check against the Funnel Leaks
+  snapshot matched exactly (32/33/33/0%) — same window, same math, two code paths.
+- **Tip for future-you**: `conversionAt(deals, from, to, asOf)` is the general
+  point-in-time conversion primitive — the snapshot `conversion()` in metrics.ts equals
+  it at `asOf = now` except for the `<= now` guard; if they ever disagree, the trend
+  chart and Funnel Leaks will visibly diverge at the rightmost point.

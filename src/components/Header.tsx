@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { fmtDateTime } from "@/lib/format";
+import type { OwnerInfo } from "@/lib/owners";
 import { isCurrentPeriod, periodKey, periodLabel, shiftPeriod } from "@/lib/periods";
 import type { DealsPayload, Granularity } from "@/lib/types";
+import { usePop } from "./Metric";
 
 /** One place that explains every marker on the page. */
 function HowToRead() {
@@ -107,9 +109,62 @@ interface HeaderProps {
   /** Name of the section whose header has scrolled under the nav, if any. */
   section?: string | null;
   refreshing: boolean;
+  owners: OwnerInfo[];
+  ownerId: string | null;
+  onOwner: (id: string | null) => void;
   onGranularity: (g: Granularity) => void;
   onPeriod: (key: string) => void;
   onRefresh: () => void;
+}
+
+/** Filter every section to one deal owner; "All owners" clears. */
+function OwnerFilter({
+  owners,
+  ownerId,
+  onOwner,
+}: {
+  owners: OwnerInfo[];
+  ownerId: string | null;
+  onOwner: (id: string | null) => void;
+}) {
+  const { open, setOpen, ref } = usePop();
+  const current = owners.find((o) => o.id === ownerId);
+  const options: { id: string | null; name: string }[] = [{ id: null, name: "All owners" }, ...owners];
+  return (
+    <span ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label="Filter by deal owner"
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
+          current ? "border-accent text-accent" : "border-rule-dark text-ink-soft hover:border-accent hover:text-accent"
+        }`}
+      >
+        {current ? current.name : "All owners"}
+        <span aria-hidden className="text-ink-faint">▾</span>
+      </button>
+      {open && (
+        <span className="absolute right-0 top-full z-40 mt-1 block w-48 border border-rule-dark bg-panel py-1 shadow-pop">
+          {options.map((o) => (
+            <button
+              key={o.id ?? "all"}
+              type="button"
+              onClick={() => {
+                onOwner(o.id);
+                setOpen(false);
+              }}
+              className={`block w-full px-3 py-1.5 text-left text-xs normal-case tracking-normal hover:bg-paper ${
+                ownerId === o.id ? "font-semibold text-accent" : "text-ink-soft"
+              }`}
+            >
+              {o.name}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export default function Header(p: HeaderProps) {
@@ -160,6 +215,9 @@ export default function Header(p: HeaderProps) {
             </button>
           ))}
         </div>
+
+        {/* owner filter — built ahead of AE #2 */}
+        <OwnerFilter owners={p.owners} ownerId={p.ownerId} onOwner={p.onOwner} />
 
         {/* period navigation */}
         <div className="flex items-center gap-1">

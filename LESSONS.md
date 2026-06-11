@@ -292,3 +292,30 @@ what to do next time. Read this file before starting any new task.
   in config — when the portal renames stages, fix the matcher there, not the lib. The
   STATUS sort ranks stale(3) > on-hold(2) > aging(1) > fresh(0), days-in-stage as
   tiebreak.
+
+### 2026-06-10 · Owner breakdown + filter (main) — **data layer extended**
+
+- **The big one**: this task lifted the session-long "don't touch the data layer"
+  guardrail (owner-approved via plan) with a strictly **additive** change:
+  `hubspot_owner_id` added to BASE_PROPS, a defensive paginated `GET /crm/v3/owners`
+  fetch (any failure → empty name map, sync never breaks), optional
+  `ownerId`/`ownerName` on `Deal`, demo owners. The guarded constants were untouched.
+- **Touched**: `hubspot.ts`/`types.ts`/`demo.ts` (above), new `owners.ts`
+  (`activeOwners`/`ownerRollup` — reuses `headlineKpis` for per-owner T12M win rate) +
+  `owners.test.ts`, new `OwnerBreakdown.tsx` (table ≥2 owners / leaderboard card solo;
+  exported `Avatar` with colored initials), `Header.tsx` (`OwnerFilter` dropdown),
+  `Dashboard.tsx` (`ownerId` state; **`visibleDeals` choke point** — every section takes
+  `deals`, so one filtered array re-scopes the whole page including Today's Focus and
+  the Stale count), drawer Owner row now real.
+- **Live findings**: (1) The token **lacks `crm.objects.owners.read`** (owners API
+  403s) → names render as "Owner <last4>". One checkbox in the HubSpot private-app
+  scopes + a Refresh fixes it — told the owner. (2) The portal has **6 distinct owner
+  ids + unassigned deals** (first-page sampling suggested 2 — paginate before concluding).
+  (3) Filtering to the active rep: 28 → 13 open deals, stale count recomputed to 0,
+  close-rate card re-scoped to 19 losses. (4) The deals cache predates the new prop —
+  a forced refresh is needed once after deploy before owners appear.
+- **Tips for future-you**: goals are team-level — a filtered view paces one rep against
+  the whole team's goals (known caveat; per-owner goals would need a store change).
+  `Avatar` accepts a `photoUrl` prop but the owners API exposes no photo — initials are
+  the real rendering. The wedged dev-tab recovers fastest via in-page
+  `location.href = url + '?r=' + random` (don't fight the navigate tool's eval race).

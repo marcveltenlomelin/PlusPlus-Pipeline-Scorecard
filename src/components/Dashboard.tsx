@@ -5,11 +5,13 @@ import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
 import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
 import { headlineWindows } from "@/lib/headline";
+import { activeOwners, dealsForOwner } from "@/lib/owners";
 import { staleDeals } from "@/lib/stale";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
 import Funnel from "./Funnel";
 import Headline from "./Headline";
+import OwnerBreakdown from "./OwnerBreakdown";
 import FunnelTrend from "./FunnelTrend";
 import Header from "./Header";
 import Pace from "./Pace";
@@ -96,6 +98,8 @@ export default function Dashboard() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [store, setStore] = useState<Store>({ goals: defaultGoals(), overrides: {} });
   const [drill, setDrill] = useState<DrillSpec | null>(null);
+  /** Owner filter: null = all owners; otherwise every section sees one rep's book. */
+  const [ownerId, setOwnerId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   /** Skeletons show while a refresh's deals fetch is in flight (never on first load). */
   const [syncing, setSyncing] = useState(false);
@@ -238,6 +242,13 @@ export default function Dashboard() {
 
   const phrase = periodPhrase(period, now);
 
+  const owners = useMemo(() => (payload ? activeOwners(payload.deals) : []), [payload]);
+  // the one choke point: every section below consumes this filtered view
+  const visibleDeals = useMemo(
+    () => (payload ? (ownerId ? dealsForOwner(payload.deals, ownerId) : payload.deals) : []),
+    [payload, ownerId]
+  );
+
   if (!mounted) {
     return (
       <div className="grid min-h-screen place-items-center text-sm text-ink-faint" role="status">
@@ -259,6 +270,9 @@ export default function Dashboard() {
         payload={payload}
         section={activeSection}
         refreshing={refreshing}
+        owners={owners}
+        ownerId={ownerId}
+        onOwner={setOwnerId}
         onGranularity={onGranularity}
         onPeriod={setPeriod}
         onRefresh={() => void load(true)}
@@ -293,7 +307,7 @@ export default function Dashboard() {
         {payload && (
           <>
             <TodayFocus
-              deals={payload.deals}
+              deals={visibleDeals}
               goals={store.goals}
               now={now}
               pilotTracked={payload.pilotTracked}
@@ -310,7 +324,7 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <Scoreboard
-                deals={payload.deals}
+                deals={visibleDeals}
                 period={period}
                 granularity={granularity}
                 pilotTracked={payload.pilotTracked}
@@ -330,7 +344,7 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <FunnelTrend
-                deals={payload.deals}
+                deals={visibleDeals}
                 granularity={granularity}
                 period={period}
                 pilotTracked={payload.pilotTracked}
@@ -347,7 +361,7 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <Pace
-                deals={payload.deals}
+                deals={visibleDeals}
                 period={period}
                 granularity={granularity}
                 goalFor={goalFor}
@@ -364,7 +378,24 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <Funnel deals={payload.deals} pilotTracked={payload.pilotTracked} />
+              <Funnel deals={visibleDeals} pilotTracked={payload.pilotTracked} />
+            </Section>
+            <Section
+              title={`By Owner · ${phrase}`}
+              subtitle="Per-rep throughput and pipeline — click a name to filter the whole page. Win rate stays trailing-12-months."
+              delay={210}
+              loading={syncing}
+              skeleton="table"
+              error={syncError}
+              onRetry={() => void load(true)}
+            >
+              {/* always the full book — this is the comparison view */}
+              <OwnerBreakdown
+                deals={payload.deals}
+                period={period}
+                selectedOwner={ownerId}
+                onSelectOwner={setOwnerId}
+              />
             </Section>
             <Section
               title="Revenue"
@@ -375,10 +406,10 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <Revenue deals={payload.deals} period={period} granularity={granularity} />
+              <Revenue deals={visibleDeals} period={period} granularity={granularity} />
             </Section>
             <Section
-              title={`Stale Deals · Needs Attention (${staleDeals(payload.deals, now).length})`}
+              title={`Stale Deals · Needs Attention (${staleDeals(visibleDeals, now).length})`}
               subtitle="Deals past their stage threshold, plus anything parked On Hold for 180+ days — worst first."
               delay={290}
               loading={syncing}
@@ -386,7 +417,7 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <StaleDeals deals={payload.deals} />
+              <StaleDeals deals={visibleDeals} />
             </Section>
             <Section
               title="Open Deals"
@@ -397,7 +428,7 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <OpenDeals deals={payload.deals} />
+              <OpenDeals deals={visibleDeals} />
             </Section>
             <Section
               title={`Headline · ${headlineWindows(now, granularity).label}`}
@@ -408,7 +439,7 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <Headline deals={payload.deals} granularity={granularity} />
+              <Headline deals={visibleDeals} granularity={granularity} />
             </Section>
             <Section
               title="Revenue Math"
@@ -419,7 +450,7 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <RevenueMath deals={payload.deals} />
+              <RevenueMath deals={visibleDeals} />
             </Section>
 
             <footer className="border-t border-rule pt-5 text-[11px] leading-relaxed text-ink-faint">

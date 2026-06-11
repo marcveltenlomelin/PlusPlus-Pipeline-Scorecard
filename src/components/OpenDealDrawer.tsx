@@ -94,7 +94,7 @@ export default function OpenDealDrawer({ deal, onClose }: { deal: Deal; onClose:
             )}
           </Row>
           <Row label="Owner">
-            <NotAvailable />
+            {deal.ownerName ?? (deal.ownerId ? `Owner ${deal.ownerId.slice(-4)}` : <NotAvailable />)}
           </Row>
           <Row label="Created">
             <span className="font-mono text-ink-soft">{fmtDate(deal.createdAt)}</span>

@@ -24,7 +24,7 @@ import type { Deal, DealsPayload, StageKey } from "./types";
 
 const HS = "https://api.hubapi.com";
 
-const BASE_PROPS = ["dealname", "amount", "dealstage", "pipeline", "createdate"];
+const BASE_PROPS = ["dealname", "amount", "dealstage", "pipeline", "createdate", "hubspot_owner_id"];
 
 interface PipelineStage {
   id: string;
@@ -56,6 +56,34 @@ async function fetchPipelineStages(token: string): Promise<PipelineStage[]> {
       isClosed: s.metadata?.isClosed === "true" || s.metadata?.isClosed === true,
     })
   );
+}
+
+/**
+ * Owner id → display name. Requires the crm.objects.owners.read scope — the
+ * current private app may not have it, so any failure degrades to an empty
+ * map (deals keep their raw owner id; the UI shows "Owner <id>"). The sync
+ * itself must never fail over this.
+ */
+async function fetchOwnerNames(token: string): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  try {
+    let after: string | undefined;
+    do {
+      const params = new URLSearchParams({ limit: "100" });
+      if (after) params.set("after", after);
+      const res = await hsGet(token, `${HS}/crm/v3/owners?${params}`);
+      if (!res.ok) return names; // 403 = scope missing; anything else: same degradation
+      const json = await res.json();
+      for (const o of json.results ?? []) {
+        const name = [o.firstName, o.lastName].filter(Boolean).join(" ").trim() || o.email;
+        if (o.id && name) names.set(String(o.id), name);
+      }
+      after = json.paging?.next?.after;
+    } while (after);
+  } catch {
+    // network/parse failure — degrade silently, ids still render
+  }
+  return names;
 }
 
 async function fetchAllDeals(token: string, properties: string[]): Promise<Record<string, unknown>[]> {
@@ -99,7 +127,11 @@ function ts(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function normalize(raw: Record<string, unknown>[], stages: PipelineStage[]): Deal[] {
+function normalize(
+  raw: Record<string, unknown>[],
+  stages: PipelineStage[],
+  ownerNames: Map<string, string>
+): Deal[] {
   const stageById = new Map(stages.map((s) => [s.id, s]));
   const deals: Deal[] = [];
   for (const r of raw) {
@@ -129,9 +161,12 @@ function normalize(raw: Record<string, unknown>[], stages: PipelineStage[]): Dea
       if (deeper.length) entered.sql = Math.min(...deeper);
     }
     const amount = num(p.amount);
+    const ownerId = p.hubspot_owner_id || undefined;
     deals.push({
       id,
       name: p.dealname || `Deal ${id}`,
+      ownerId,
+      ownerName: ownerId ? ownerNames.get(ownerId) : undefined,
       amount,
       value: amount ?? DEFAULT_DEAL_VALUE,
       stageId: p.dealstage ?? "unknown",
@@ -178,8 +213,8 @@ export async function getDeals(opts: { force?: boolean } = {}): Promise<CacheSha
   try {
     const stages = await fetchPipelineStages(token);
     const props = [...BASE_PROPS, ...Object.values(STAGE_ENTRY_PROPS), PILOT_ENTRY_FALLBACK_PROP];
-    const raw = await fetchAllDeals(token, props);
-    const deals = normalize(raw, stages);
+    const [raw, ownerNames] = await Promise.all([fetchAllDeals(token, props), fetchOwnerNames(token)]);
+    const deals = normalize(raw, stages, ownerNames);
     const pilotStageId = stages.find((s) => PILOT_STAGE_MATCH.test(s.label))?.id ?? null;
     const data: CacheShape = {
       payload: {

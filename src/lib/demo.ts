@@ -28,6 +28,13 @@ function mulberry32(seed: number) {
   };
 }
 
+/** Demo owners so the By Owner table renders multi-row without a live portal. */
+const OWNERS = [
+  { id: "demo-1", name: "Alex Rivera" },
+  { id: "demo-2", name: "Sam Chen" },
+  { id: "demo-3", name: "Jordan Blake" },
+];
+
 const COMPANIES = [
   "Acme Robotics", "Northwind Labs", "Hooli Cloud", "Vandelay Systems", "Initech",
   "Globex Learning", "Stark Industries", "Wayne Tech", "Umbrella Health", "Pied Piper",
@@ -100,9 +107,12 @@ export function demoDeals(): { deals: Deal[]; pilotStageId: string } {
     const hasAmount = rand() < 0.6;
     const amount = hasAmount ? Math.round((20 + rand() * 100) / 5) * 5000 : null;
     const dealId = String(id++);
+    const owner = OWNERS[Math.floor(rand() * OWNERS.length)];
     deals.push({
       id: dealId,
       name: `${COMPANIES[Math.floor(rand() * COMPANIES.length)]} — Platform`,
+      ownerId: owner.id,
+      ownerName: owner.name,
       amount,
       value: amount ?? DEFAULT_DEAL_VALUE,
       stageId: stage.id,

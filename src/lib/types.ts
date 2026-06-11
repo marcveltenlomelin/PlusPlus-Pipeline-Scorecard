@@ -16,6 +16,10 @@ export interface StageGoal {
 export interface Deal {
   id: string;
   name: string;
+  /** HubSpot owner id (hubspot_owner_id); absent when unassigned. */
+  ownerId?: string;
+  /** Resolved owner name; absent when the owners API scope is missing. */
+  ownerName?: string;
   /** Raw HubSpot amount; null when not set on the deal. */
   amount: number | null;
   /** amount when set, otherwise DEFAULT_DEAL_VALUE. */

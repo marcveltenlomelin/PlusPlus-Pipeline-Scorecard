@@ -71,52 +71,6 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
             {data.variant === "aggregate" ? " · aggregate view" : ""}
           </Text>
 
-          {sections.focus && data.focus.length > 0 && (
-            <>
-              <SectionTitle>{"Today's Focus"}</SectionTitle>
-              {data.focus.map((f, i) => (
-                <Section key={i} style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, borderLeft: `3px solid ${CHIP_COLOR[f.category] ?? GREEN}`, padding: "12px 14px", marginBottom: 8 }}>
-                  <Text style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: CHIP_COLOR[f.category] ?? GREEN }}>
-                    {f.category}
-                  </Text>
-                  <Text style={{ margin: "6px 0 2px", fontSize: 14, fontWeight: 600, lineHeight: "20px" }}>{f.diagnosis}</Text>
-                  <Text style={{ margin: 0, fontSize: 13, color: SOFT, lineHeight: "19px" }}>
-                    {f.action}
-                    {f.href ? (
-                      <>
-                        {" "}
-                        <Link href={f.href} style={{ color: ACCENT }}>
-                          Open in HubSpot →
-                        </Link>
-                      </>
-                    ) : null}
-                  </Text>
-                </Section>
-              ))}
-            </>
-          )}
-
-          {sections.headline && (
-            <>
-              <SectionTitle>Headline KPIs</SectionTitle>
-              <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
-                {data.kpis.map((kpi, i) => (
-                  <table key={i} width="100%" cellPadding={0} cellSpacing={0} style={{ borderBottom: i < data.kpis.length - 1 ? `1px solid ${RULE}` : "none" }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ padding: "9px 0", fontSize: 13, color: SOFT }}>{kpi.label}</td>
-                        <td align="right" style={{ padding: "9px 0", fontFamily: mono, fontSize: 14, fontWeight: 700 }}>{kpi.value}</td>
-                      </tr>
-                      <tr>
-                        <td colSpan={2} style={{ paddingBottom: 9, fontFamily: mono, fontSize: 11, color: FAINT }}>{kpi.detail}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                ))}
-              </Section>
-            </>
-          )}
-
           {sections.funnel && (
             <>
               <SectionTitle>Stage entries this week</SectionTitle>
@@ -143,6 +97,49 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
             </>
           )}
 
+          {sections.revenue && (
+            <>
+              <SectionTitle>Revenue</SectionTitle>
+              <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
+                {data.revenue.map((r, i) => (
+                  <table key={i} width="100%" cellPadding={0} cellSpacing={0} style={{ borderBottom: i < data.revenue.length - 1 ? `1px solid ${RULE}` : "none" }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: "8px 0", fontSize: 13, color: SOFT }}>{r.label}</td>
+                        <td align="right" style={{ padding: "8px 0", fontFamily: mono, fontSize: 14, fontWeight: 700 }}>{r.value}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ))}
+              </Section>
+            </>
+          )}
+
+          {sections.focus && data.focus.length > 0 && (
+            <>
+              <SectionTitle>{"Today's Focus"}</SectionTitle>
+              {data.focus.map((f, i) => (
+                <Section key={i} style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, borderLeft: `3px solid ${CHIP_COLOR[f.category] ?? GREEN}`, padding: "12px 14px", marginBottom: 8 }}>
+                  <Text style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: CHIP_COLOR[f.category] ?? GREEN }}>
+                    {f.category}
+                  </Text>
+                  <Text style={{ margin: "6px 0 2px", fontSize: 14, fontWeight: 600, lineHeight: "20px" }}>{f.diagnosis}</Text>
+                  <Text style={{ margin: 0, fontSize: 13, color: SOFT, lineHeight: "19px" }}>
+                    {f.action}
+                    {f.href ? (
+                      <>
+                        {" "}
+                        <Link href={f.href} style={{ color: ACCENT }}>
+                          Open in HubSpot →
+                        </Link>
+                      </>
+                    ) : null}
+                  </Text>
+                </Section>
+              ))}
+            </>
+          )}
+
           {sections.stale && (
             <>
               <SectionTitle>Stale deals · needs attention</SectionTitle>
@@ -165,16 +162,19 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
             </>
           )}
 
-          {sections.revenue && (
+          {sections.headline && (
             <>
-              <SectionTitle>Revenue</SectionTitle>
+              <SectionTitle>Headline KPIs</SectionTitle>
               <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
-                {data.revenue.map((r, i) => (
-                  <table key={i} width="100%" cellPadding={0} cellSpacing={0} style={{ borderBottom: i < data.revenue.length - 1 ? `1px solid ${RULE}` : "none" }}>
+                {data.kpis.map((kpi, i) => (
+                  <table key={i} width="100%" cellPadding={0} cellSpacing={0} style={{ borderBottom: i < data.kpis.length - 1 ? `1px solid ${RULE}` : "none" }}>
                     <tbody>
                       <tr>
-                        <td style={{ padding: "8px 0", fontSize: 13, color: SOFT }}>{r.label}</td>
-                        <td align="right" style={{ padding: "8px 0", fontFamily: mono, fontSize: 14, fontWeight: 700 }}>{r.value}</td>
+                        <td style={{ padding: "9px 0", fontSize: 13, color: SOFT }}>{kpi.label}</td>
+                        <td align="right" style={{ padding: "9px 0", fontFamily: mono, fontSize: 14, fontWeight: 700 }}>{kpi.value}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={2} style={{ paddingBottom: 9, fontFamily: mono, fontSize: 11, color: FAINT }}>{kpi.detail}</td>
                       </tr>
                     </tbody>
                   </table>

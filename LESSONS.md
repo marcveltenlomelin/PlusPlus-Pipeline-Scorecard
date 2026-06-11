@@ -319,3 +319,29 @@ what to do next time. Read this file before starting any new task.
   `Avatar` accepts a `photoUrl` prop but the owners API exposes no photo — initials are
   the real rendering. The wedged dev-tab recovers fastest via in-page
   `location.href = url + '?r=' + random` (don't fight the navigate tool's eval race).
+
+### 2026-06-10 · SDR sourcing attribution (main)
+
+- **What/why**: Marc's structure — Marco/Michael (HubSpot owners) *lead* deals; the
+  **SDR who sourced** a deal has no HubSpot home, so it's dashboard-native. Roster +
+  per-deal assignment live in the manual store (`store.json`): `sdrs: string[]`,
+  `dealSdrs: Record<dealId, name>`, new **pure `applyPatch`** in store.ts (extracted,
+  unit-tested; removal unassigns; assignments to unknown names are ignored). PATCH keys
+  additive — the legacy `{setOverrides, clearOverrides, goals}` contract untouched.
+- **Touched**: `types.ts`/`store.ts`/`store.test.ts`, `owners.ts` (`ownerRollup`/
+  `activeOwners` gained an `ownerOf` selector param — HubSpot-owner default keeps old
+  tests green; new `sdrOwnerOf`), `Header.tsx` (the nav dropdown is now the **SDR
+  roster manager**: add via input, ✕ removes, counts per name, Unassigned bucket),
+  `Dashboard.tsx` (sdrFilter replaces ownerId at the visibleDeals choke point; By Owner
+  section → **By SDR**), `Revenue.tsx` (SDR `<select>` column, stopPropagation),
+  `OpenDealDrawer.tsx` ("Sourced by" select next to the HubSpot "Owner" row).
+- **Surprises**: (1) Driving a React `<select>` from page JS: re-query the node
+  *immediately* before dispatching `change` — a node captured before a store-driven
+  re-render is detached and the event never reaches React's root (one assignment
+  silently no-oped until re-driven). (2) The same native-setter trick as inputs applies
+  (`HTMLSelectElement.prototype` value setter + bubbling change). (3) `usePop` dropdowns
+  can host inputs fine — outside-click uses `ref.contains`, so typing inside stays open.
+- **⚠️ Persistence**: SDR data lives in `data/store.json` = **wiped every Vercel
+  deploy** (the documented known limitation, now carrying hand-entered attribution, not
+  just goal tweaks). Recommended to Marc: make the KV/Blob decision before the team
+  relies on assignments. Do NOT silently move storage (CLAUDE.md).

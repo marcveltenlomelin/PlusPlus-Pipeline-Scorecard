@@ -26,7 +26,16 @@ function NotAvailable() {
  * leaving the dashboard; the prominent footer button opens the live record.
  * Mirrors Drilldown's dismiss behavior (Escape, outside-click, scroll-lock).
  */
-export default function OpenDealDrawer({ deal, onClose }: { deal: Deal; onClose: () => void }) {
+interface OpenDealDrawerProps {
+  deal: Deal;
+  /** SDR roster + this deal's sourcing assignment (dashboard-native, not HubSpot). */
+  sdrs: string[];
+  sdr: string | null;
+  onAssignSdr: (sdr: string | null) => void;
+  onClose: () => void;
+}
+
+export default function OpenDealDrawer({ deal, sdrs, sdr, onAssignSdr, onClose }: OpenDealDrawerProps) {
   const { now } = useDash();
   const ref = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -95,6 +104,22 @@ export default function OpenDealDrawer({ deal, onClose }: { deal: Deal; onClose:
           </Row>
           <Row label="Owner">
             {deal.ownerName ?? (deal.ownerId ? `Owner ${deal.ownerId.slice(-4)}` : <NotAvailable />)}
+          </Row>
+          <Row label="Sourced by">
+            <select
+              value={sdr ?? ""}
+              onChange={(e) => onAssignSdr(e.target.value || null)}
+              aria-label="Sourcing SDR"
+              title="Who sourced this deal — managed in the dashboard, not HubSpot"
+              className="border border-rule bg-paper px-1.5 py-1 text-xs text-ink-soft focus:border-accent focus:outline-none"
+            >
+              <option value="">— unassigned</option>
+              {sdrs.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </Row>
           <Row label="Created">
             <span className="font-mono text-ink-soft">{fmtDate(deal.createdAt)}</span>

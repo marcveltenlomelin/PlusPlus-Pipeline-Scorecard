@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { fmtDateTime } from "@/lib/format";
-import type { OwnerInfo } from "@/lib/owners";
+import { UNASSIGNED_ID } from "@/lib/owners";
 import { isCurrentPeriod, periodKey, periodLabel, shiftPeriod } from "@/lib/periods";
 import type { DealsPayload, Granularity } from "@/lib/types";
 import { usePop } from "./Metric";
@@ -109,58 +109,93 @@ interface HeaderProps {
   /** Name of the section whose header has scrolled under the nav, if any. */
   section?: string | null;
   refreshing: boolean;
-  owners: OwnerInfo[];
-  ownerId: string | null;
-  onOwner: (id: string | null) => void;
+  sdrs: { name: string; count: number }[];
+  sdrFilter: string | null;
+  onSdrFilter: (name: string | null) => void;
+  onAddSdr: (name: string) => void;
+  onRemoveSdr: (name: string) => void;
   onGranularity: (g: Granularity) => void;
   onPeriod: (key: string) => void;
   onRefresh: () => void;
 }
 
-/** Filter every section to one deal owner; "All owners" clears. */
-function OwnerFilter({
-  owners,
-  ownerId,
-  onOwner,
-}: {
-  owners: OwnerInfo[];
-  ownerId: string | null;
-  onOwner: (id: string | null) => void;
-}) {
+/**
+ * The SDR roster + filter. SDRs are who *sourced* a deal — a dashboard-native
+ * attribution (the HubSpot owner is the deal lead, a different role). Names
+ * are managed right here: add via the input, ✕ to remove (removal unassigns
+ * that SDR's deals).
+ */
+function SdrFilter(p: Pick<HeaderProps, "sdrs" | "sdrFilter" | "onSdrFilter" | "onAddSdr" | "onRemoveSdr">) {
   const { open, setOpen, ref } = usePop();
-  const current = owners.find((o) => o.id === ownerId);
-  const options: { id: string | null; name: string }[] = [{ id: null, name: "All owners" }, ...owners];
+  const [draft, setDraft] = useState("");
+  const label =
+    p.sdrFilter === UNASSIGNED_ID ? "Unassigned" : (p.sdrFilter ?? "All SDRs");
+  const add = () => {
+    const name = draft.trim();
+    if (name) p.onAddSdr(name);
+    setDraft("");
+  };
+  const item = (active: boolean) =>
+    `flex-1 px-3 py-1.5 text-left text-xs normal-case tracking-normal hover:bg-paper ${
+      active ? "font-semibold text-accent" : "text-ink-soft"
+    }`;
   return (
     <span ref={ref} className="relative inline-block">
       <button
         type="button"
         aria-expanded={open}
-        aria-label="Filter by deal owner"
+        aria-label="Filter by sourcing SDR"
         onClick={() => setOpen(!open)}
         className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
-          current ? "border-accent text-accent" : "border-rule-dark text-ink-soft hover:border-accent hover:text-accent"
+          p.sdrFilter ? "border-accent text-accent" : "border-rule-dark text-ink-soft hover:border-accent hover:text-accent"
         }`}
       >
-        {current ? current.name : "All owners"}
+        {label}
         <span aria-hidden className="text-ink-faint">▾</span>
       </button>
       {open && (
-        <span className="absolute right-0 top-full z-40 mt-1 block w-48 border border-rule-dark bg-panel py-1 shadow-pop">
-          {options.map((o) => (
-            <button
-              key={o.id ?? "all"}
-              type="button"
-              onClick={() => {
-                onOwner(o.id);
-                setOpen(false);
-              }}
-              className={`block w-full px-3 py-1.5 text-left text-xs normal-case tracking-normal hover:bg-paper ${
-                ownerId === o.id ? "font-semibold text-accent" : "text-ink-soft"
-              }`}
-            >
-              {o.name}
-            </button>
+        <span className="absolute right-0 top-full z-40 block w-56 border border-rule-dark bg-panel py-1 shadow-pop">
+          <button type="button" onClick={() => { p.onSdrFilter(null); setOpen(false); }} className={item(p.sdrFilter === null)}>
+            All SDRs
+          </button>
+          {p.sdrs.map((s) => (
+            <span key={s.name} className="flex items-center">
+              <button
+                type="button"
+                onClick={() => { p.onSdrFilter(s.name); setOpen(false); }}
+                className={item(p.sdrFilter === s.name)}
+              >
+                {s.name} <span className="font-mono text-ink-faint">({s.count})</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Remove SDR ${s.name}`}
+                title="Remove — their deals become unassigned"
+                onClick={() => p.onRemoveSdr(s.name)}
+                className="px-2 text-ink-faint hover:text-bad"
+              >
+                ✕
+              </button>
+            </span>
           ))}
+          <button
+            type="button"
+            onClick={() => { p.onSdrFilter(UNASSIGNED_ID); setOpen(false); }}
+            className={item(p.sdrFilter === UNASSIGNED_ID)}
+          >
+            Unassigned
+          </button>
+          <span className="mt-1 block border-t border-rule px-3 py-2">
+            <input
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+              placeholder="Add SDR… (Enter)"
+              aria-label="Add an SDR name"
+              className="w-full border border-rule bg-paper px-2 py-1 text-xs normal-case tracking-normal text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            />
+          </span>
         </span>
       )}
     </span>
@@ -216,8 +251,14 @@ export default function Header(p: HeaderProps) {
           ))}
         </div>
 
-        {/* owner filter — built ahead of AE #2 */}
-        <OwnerFilter owners={p.owners} ownerId={p.ownerId} onOwner={p.onOwner} />
+        {/* SDR roster + filter — sourcing attribution lives here, not in HubSpot */}
+        <SdrFilter
+          sdrs={p.sdrs}
+          sdrFilter={p.sdrFilter}
+          onSdrFilter={p.onSdrFilter}
+          onAddSdr={p.onAddSdr}
+          onRemoveSdr={p.onRemoveSdr}
+        />
 
         {/* period navigation */}
         <div className="flex items-center gap-1">

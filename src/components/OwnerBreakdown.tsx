@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { fmtMoney, fmtNum, fmtPct } from "@/lib/format";
-import { ownerRollup, UNASSIGNED_ID, type OwnerRow } from "@/lib/owners";
+import { ownerRollup, UNASSIGNED_ID, type OwnerInfo, type OwnerRow } from "@/lib/owners";
 import type { Deal } from "@/lib/types";
 import { useDash } from "./ctx";
 
@@ -44,6 +44,8 @@ export function Avatar({ name, photoUrl }: { name: string; photoUrl?: string }) 
 interface OwnerBreakdownProps {
   deals: Deal[];
   period: string;
+  /** Attribution selector — defaults to HubSpot owner; pass sdrOwnerOf(...) for sourcing. */
+  ownerOf?: (deal: Deal) => OwnerInfo;
   /** Currently filtered owner (highlight + toggle target). */
   selectedOwner: string | null;
   onSelectOwner: (id: string | null) => void;
@@ -65,7 +67,10 @@ function winRateCell(row: OwnerRow): string {
 /** Per-rep period volumes + T12M win rate. Single-owner books get a leaderboard card. */
 export default function OwnerBreakdown(p: OwnerBreakdownProps) {
   const { now } = useDash();
-  const rows = useMemo(() => ownerRollup(p.deals, p.period, now), [p.deals, p.period, now]);
+  const rows = useMemo(
+    () => ownerRollup(p.deals, p.period, now, p.ownerOf),
+    [p.deals, p.period, now, p.ownerOf]
+  );
 
   // Solo book: one card with tiles instead of a one-row table.
   if (rows.length === 1) {
@@ -129,7 +134,7 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
                     <Avatar name={r.owner.name} />
                     {r.owner.name}
                     {r.owner.id === UNASSIGNED_ID && (
-                      <span className="text-[9px] uppercase text-ink-faint">no owner set</span>
+                      <span className="text-[9px] uppercase text-ink-faint">not attributed</span>
                     )}
                   </button>
                 </td>

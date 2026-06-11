@@ -313,7 +313,15 @@ function valueRangeLabel(min: number | null, max: number | null): string {
 const FILTER_CTRL =
   "border border-rule bg-paper px-2 py-1 text-xs text-ink hover:border-rule-dark focus:border-accent focus:outline-none";
 
-export function OpenDeals({ deals }: { deals: Deal[] }) {
+interface OpenDealsProps {
+  deals: Deal[];
+  /** SDR roster + assignments (sourcing attribution — managed in the nav dropdown). */
+  sdrs: string[];
+  dealSdrs: Record<string, string>;
+  onAssignSdr: (dealId: string, sdr: string | null) => void;
+}
+
+export function OpenDeals({ deals, sdrs, dealSdrs, onAssignSdr }: OpenDealsProps) {
   const { now } = useDash();
 
   const open = useMemo(() => deals.filter((d) => d.isOpen), [deals]);
@@ -674,7 +682,7 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
 
       <div ref={tableWrapRef} className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[42rem] text-sm">
+        <table className="w-full min-w-[46rem] text-sm">
           <thead>
             <tr className="border-b border-rule text-left">
               <SortTh label="Deal" k="name" className="px-5" />
@@ -693,13 +701,16 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
               </th>
               <SortTh label="Created" k="created" className="px-3" />
               <SortTh label="Age" k="age" className="px-3" />
+              <th className="microlabel px-3 py-2 font-semibold" title="Sourcing SDR — assigned here, not in HubSpot">
+                SDR
+              </th>
               <th className="px-5 py-2" />
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center">
+                <td colSpan={8} className="px-5 py-12 text-center">
                   <p className="text-sm text-ink-soft">No deals match these filters</p>
                   <button
                     type="button"
@@ -741,6 +752,23 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{fmtDate(d.createdAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{daysAgo(d.createdAt, now)}</td>
+                  <td className="whitespace-nowrap px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <select
+                      value={dealSdrs[d.id] ?? ""}
+                      onChange={(e) => onAssignSdr(d.id, e.target.value || null)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      aria-label={`Sourcing SDR for ${d.name}`}
+                      title="Who sourced this deal"
+                      className="border border-rule bg-paper px-1.5 py-1 text-xs text-ink-soft focus:border-accent focus:outline-none"
+                    >
+                      <option value="">—</option>
+                      {sdrs.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
                   <td className="whitespace-nowrap px-5 py-2 text-right">
                     <a
                       href={d.hubspotUrl}
@@ -760,7 +788,15 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
       </div>
       </div>
 
-      {selected && <OpenDealDrawer deal={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <OpenDealDrawer
+          deal={selected}
+          sdrs={sdrs}
+          sdr={dealSdrs[selected.id] ?? null}
+          onAssignSdr={(s) => onAssignSdr(selected.id, s)}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

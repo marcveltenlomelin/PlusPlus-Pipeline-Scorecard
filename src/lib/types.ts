@@ -62,4 +62,24 @@ export interface Store {
   goals: Record<GoalStage, StageGoal>;
   /** Manual overrides keyed by metric cell id, e.g. "tp:sal:2026-06". */
   overrides: Record<string, Override>;
+  /**
+   * SDR roster — who *sourced* deals. Deliberately dashboard-native: the
+   * HubSpot owner is the deal lead (a different person), and sourcing
+   * attribution has no home in the portal. Names are the identity.
+   */
+  sdrs: string[];
+  /** Deal id → sourcing SDR name. */
+  dealSdrs: Record<string, string>;
+}
+
+/** PATCH body for /api/store — additive keys only; existing shape is load-bearing. */
+export interface StorePatch {
+  goals?: Partial<Record<GoalStage, Partial<StageGoal>>>;
+  setOverrides?: Record<string, Override>;
+  clearOverrides?: string[];
+  addSdrs?: string[];
+  /** Removing an SDR also unassigns their deals. */
+  removeSdrs?: string[];
+  /** Deal id → SDR name, or null to clear the assignment. */
+  setDealSdrs?: Record<string, string | null>;
 }

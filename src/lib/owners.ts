@@ -25,10 +25,14 @@ function ownerIdOf(deal: Deal): string {
   return deal.ownerId ?? UNASSIGNED_ID;
 }
 
-/** Distinct owners across the book, "Unassigned" last. */
-export function activeOwners(deals: Deal[]): OwnerInfo[] {
+/** Distinct owners across the book under an attribution, "Unassigned" last. */
+export function activeOwners(deals: Deal[], ownerOf?: (deal: Deal) => OwnerInfo): OwnerInfo[] {
+  const of = ownerOf ?? hubspotOwnerOf;
   const map = new Map<string, string>();
-  for (const d of deals) map.set(ownerIdOf(d), ownerDisplayName(d));
+  for (const d of deals) {
+    const o = of(d);
+    map.set(o.id, o.name);
+  }
   return [...map.entries()]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) =>
@@ -38,6 +42,22 @@ export function activeOwners(deals: Deal[]): OwnerInfo[] {
 
 export function dealsForOwner(deals: Deal[], ownerId: string): Deal[] {
   return deals.filter((d) => ownerIdOf(d) === ownerId);
+}
+
+/** Attribution selector: HubSpot owner (deal lead) — the default. */
+function hubspotOwnerOf(deal: Deal): OwnerInfo {
+  return { id: ownerIdOf(deal), name: ownerDisplayName(deal) };
+}
+
+/**
+ * Attribution selector: sourcing SDR from the manual store (dashboard-native;
+ * HubSpot has no field for who sourced a deal). Names are the identity.
+ */
+export function sdrOwnerOf(dealSdrs: Record<string, string>): (deal: Deal) => OwnerInfo {
+  return (deal) => {
+    const name = dealSdrs[deal.id];
+    return name ? { id: name, name } : { id: UNASSIGNED_ID, name: "Unassigned" };
+  };
 }
 
 export interface OwnerRow {
@@ -55,10 +75,16 @@ export interface OwnerRow {
 }
 
 /** Per-owner period volumes + T12M win rate, sorted by pipe $ created desc. */
-export function ownerRollup(deals: Deal[], period: string, now: number): OwnerRow[] {
+export function ownerRollup(
+  deals: Deal[],
+  period: string,
+  now: number,
+  ownerOf?: (deal: Deal) => OwnerInfo
+): OwnerRow[] {
+  const of = ownerOf ?? hubspotOwnerOf;
   const t12m = headlineWindows(now, "month"); // always trailing 12 months, per spec
-  return activeOwners(deals).map((owner) => {
-    const mine = dealsForOwner(deals, owner.id);
+  return activeOwners(deals, of).map((owner) => {
+    const mine = deals.filter((d) => of(d).id === owner.id);
     const k = headlineKpis(mine, t12m.cur, t12m.prior);
     return {
       owner,

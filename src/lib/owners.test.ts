@@ -79,4 +79,20 @@ describe("ownerRollup", () => {
     const rows = ownerRollup([deal({ id: "a1", ...A })], MONTH, NOW);
     expect(rows).toHaveLength(1);
   });
+
+  it("rolls up by SDR attribution when given an ownerOf selector", async () => {
+    const { sdrOwnerOf } = await import("./owners");
+    const sal = NOW - 3 * DAY;
+    const deals = [
+      deal({ id: "d1", ...A, createdAt: sal, entered: { sal, sql: NOW - DAY }, value: 70_000 }),
+      deal({ id: "d2", ...A, createdAt: sal, entered: { sal } }),
+      deal({ id: "d3", ...B, createdAt: sal, entered: { sal } }),
+    ];
+    // SDR map cuts across HubSpot owners: Ana sourced d1+d3, d2 unassigned
+    const rows = ownerRollup(deals, MONTH, NOW, sdrOwnerOf({ d1: "Ana", d3: "Ana" }));
+    expect(rows.map((r) => r.owner.name)).toEqual(["Ana", "Unassigned"]);
+    expect(rows[0].sals).toBe(2);
+    expect(rows[0].pipeValue).toBe(70_000);
+    expect(rows[1].sals).toBe(1);
+  });
 });

@@ -5,7 +5,7 @@ import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
 import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
 import { headlineWindows } from "@/lib/headline";
-import { activeOwners, dealsForOwner } from "@/lib/owners";
+import { sdrOwnerOf, UNASSIGNED_ID } from "@/lib/owners";
 import { staleDeals } from "@/lib/stale";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
@@ -87,6 +87,10 @@ function defaultGoals(): Store["goals"] {
   ) as Store["goals"];
 }
 
+function emptyStore(): Store {
+  return { goals: defaultGoals(), overrides: {}, sdrs: [], dealSdrs: {} };
+}
+
 export default function Dashboard() {
   // The page is statically prerendered; date-derived UI must not hydrate
   // against a stale build-time clock.
@@ -96,10 +100,10 @@ export default function Dashboard() {
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [period, setPeriod] = useState(() => periodKey(Date.now(), "month"));
   const [payload, setPayload] = useState<Payload | null>(null);
-  const [store, setStore] = useState<Store>({ goals: defaultGoals(), overrides: {} });
+  const [store, setStore] = useState<Store>(emptyStore);
   const [drill, setDrill] = useState<DrillSpec | null>(null);
-  /** Owner filter: null = all owners; otherwise every section sees one rep's book. */
-  const [ownerId, setOwnerId] = useState<string | null>(null);
+  /** SDR filter: null = all; an SDR name (or UNASSIGNED_ID) scopes every section to who sourced the deal. */
+  const [sdrFilter, setSdrFilter] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   /** Skeletons show while a refresh's deals fetch is in flight (never on first load). */
   const [syncing, setSyncing] = useState(false);
@@ -242,11 +246,24 @@ export default function Dashboard() {
 
   const phrase = periodPhrase(period, now);
 
-  const owners = useMemo(() => (payload ? activeOwners(payload.deals) : []), [payload]);
+  // SDR roster with owned-deal counts for the nav dropdown
+  const sdrOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const sdr of Object.values(store.dealSdrs)) counts.set(sdr, (counts.get(sdr) ?? 0) + 1);
+    return store.sdrs.map((name) => ({ name, count: counts.get(name) ?? 0 }));
+  }, [store.sdrs, store.dealSdrs]);
+
   // the one choke point: every section below consumes this filtered view
-  const visibleDeals = useMemo(
-    () => (payload ? (ownerId ? dealsForOwner(payload.deals, ownerId) : payload.deals) : []),
-    [payload, ownerId]
+  const visibleDeals = useMemo(() => {
+    if (!payload) return [];
+    if (!sdrFilter) return payload.deals;
+    const of = sdrOwnerOf(store.dealSdrs);
+    return payload.deals.filter((d) => of(d).id === sdrFilter);
+  }, [payload, sdrFilter, store.dealSdrs]);
+
+  const assignSdr = useCallback(
+    (dealId: string, sdr: string | null) => void patchStore({ setDealSdrs: { [dealId]: sdr } }),
+    [patchStore]
   );
 
   if (!mounted) {
@@ -270,9 +287,14 @@ export default function Dashboard() {
         payload={payload}
         section={activeSection}
         refreshing={refreshing}
-        owners={owners}
-        ownerId={ownerId}
-        onOwner={setOwnerId}
+        sdrs={sdrOptions}
+        sdrFilter={sdrFilter}
+        onSdrFilter={setSdrFilter}
+        onAddSdr={(name) => void patchStore({ addSdrs: [name] })}
+        onRemoveSdr={(name) => {
+          if (sdrFilter === name) setSdrFilter(null);
+          void patchStore({ removeSdrs: [name] });
+        }}
         onGranularity={onGranularity}
         onPeriod={setPeriod}
         onRefresh={() => void load(true)}
@@ -381,8 +403,8 @@ export default function Dashboard() {
               <Funnel deals={visibleDeals} pilotTracked={payload.pilotTracked} />
             </Section>
             <Section
-              title={`By Owner · ${phrase}`}
-              subtitle="Per-rep throughput and pipeline — click a name to filter the whole page. Win rate stays trailing-12-months."
+              title={`By SDR · ${phrase}`}
+              subtitle="Sourcing attribution — who brought each deal in (assigned here, not in HubSpot). Click a name to filter the whole page. Win rate stays trailing-12-months."
               delay={210}
               loading={syncing}
               skeleton="table"
@@ -393,8 +415,9 @@ export default function Dashboard() {
               <OwnerBreakdown
                 deals={payload.deals}
                 period={period}
-                selectedOwner={ownerId}
-                onSelectOwner={setOwnerId}
+                ownerOf={sdrOwnerOf(store.dealSdrs)}
+                selectedOwner={sdrFilter}
+                onSelectOwner={setSdrFilter}
               />
             </Section>
             <Section
@@ -428,7 +451,7 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <OpenDeals deals={visibleDeals} />
+              <OpenDeals deals={visibleDeals} sdrs={store.sdrs} dealSdrs={store.dealSdrs} onAssignSdr={assignSdr} />
             </Section>
             <Section
               title={`Headline · ${headlineWindows(now, granularity).label}`}

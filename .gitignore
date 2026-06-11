@@ -11,3 +11,6 @@ next-env.d.ts
 # local persistence (overrides, goals, fetch cache)
 data/
 .vercel
+
+# Playwright MCP session artifacts (sanctioned screenshots live in tests/visual/)
+.playwright-mcp/

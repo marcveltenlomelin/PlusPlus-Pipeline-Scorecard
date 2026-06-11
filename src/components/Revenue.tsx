@@ -34,6 +34,7 @@ import type { Deal, Granularity } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
 import { EMPTY_TRACK, InfoTip, Metric, StaleBadge, usePop } from "./Metric";
 import OpenDealDrawer from "./OpenDealDrawer";
+import { Avatar } from "./OwnerBreakdown";
 
 interface RevenueProps {
   deals: Deal[];
@@ -753,21 +754,28 @@ export function OpenDeals({ deals, sdrs, dealSdrs, onAssignSdr }: OpenDealsProps
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{fmtDate(d.createdAt)}</td>
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{daysAgo(d.createdAt, now)}</td>
                   <td className="whitespace-nowrap px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={dealSdrs[d.id] ?? ""}
-                      onChange={(e) => onAssignSdr(d.id, e.target.value || null)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      aria-label={`Sourcing SDR for ${d.name}`}
-                      title="Who sourced this deal"
-                      className="border border-rule bg-paper px-1.5 py-1 text-xs text-ink-soft focus:border-accent focus:outline-none"
-                    >
-                      <option value="">—</option>
-                      {sdrs.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                    <span className="inline-flex items-center gap-1.5">
+                      {dealSdrs[d.id] && <Avatar name={dealSdrs[d.id]} />}
+                      <select
+                        value={dealSdrs[d.id] ?? ""}
+                        onChange={(e) => onAssignSdr(d.id, e.target.value || null)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        aria-label={`Sourcing SDR for ${d.name}`}
+                        title="Who sourced this deal — assigned here, not in HubSpot"
+                        className={
+                          dealSdrs[d.id]
+                            ? "border border-transparent bg-transparent px-1 py-1 text-xs text-ink-soft hover:border-rule focus:border-accent focus:outline-none"
+                            : "border border-dashed border-rule-dark bg-transparent px-1.5 py-1 text-xs text-ink-faint hover:border-accent hover:text-accent focus:border-accent focus:outline-none"
+                        }
+                      >
+                        <option value="">+ SDR</option>
+                        {sdrs.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </span>
                   </td>
                   <td className="whitespace-nowrap px-5 py-2 text-right">
                     <a

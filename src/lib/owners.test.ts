@@ -93,6 +93,7 @@ describe("ownerRollup", () => {
     expect(rows.map((r) => r.owner.name)).toEqual(["Ana", "Unassigned"]);
     expect(rows[0].sals).toBe(2);
     expect(rows[0].pipeValue).toBe(70_000);
+    expect(rows[0].openDeals).toBe(2); // owned-now count, independent of the period
     expect(rows[1].sals).toBe(1);
   });
 });

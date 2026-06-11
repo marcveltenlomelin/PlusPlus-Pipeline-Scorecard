@@ -158,14 +158,20 @@ function SdrFilter(p: Pick<HeaderProps, "sdrs" | "sdrFilter" | "onSdrFilter" | "
           <button type="button" onClick={() => { p.onSdrFilter(null); setOpen(false); }} className={item(p.sdrFilter === null)}>
             All SDRs
           </button>
+          {p.sdrs.length > 0 && (
+            <span className="microlabel block px-3 pb-1 pt-2 normal-case">Roster</span>
+          )}
           {p.sdrs.map((s) => (
             <span key={s.name} className="flex items-center">
               <button
                 type="button"
                 onClick={() => { p.onSdrFilter(s.name); setOpen(false); }}
-                className={item(p.sdrFilter === s.name)}
+                className={`${item(p.sdrFilter === s.name)} flex items-center justify-between gap-2`}
               >
-                {s.name} <span className="font-mono text-ink-faint">({s.count})</span>
+                <span>{s.name}</span>
+                <span className="font-mono text-[10px] text-ink-faint" title="deals attributed">
+                  {s.count}
+                </span>
               </button>
               <button
                 type="button"

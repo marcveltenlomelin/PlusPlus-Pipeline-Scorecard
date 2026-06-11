@@ -12,6 +12,12 @@ export async function PATCH(req: NextRequest) {
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const store = await patchStore(body);
-  return NextResponse.json(store);
+  try {
+    const store = await patchStore(body);
+    return NextResponse.json(store);
+  } catch (err) {
+    // a failed save must be visible to the client, never an opaque crash
+    const message = err instanceof Error ? err.message : "Store write failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

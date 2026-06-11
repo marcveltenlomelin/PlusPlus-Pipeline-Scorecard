@@ -109,6 +109,8 @@ export default function Dashboard() {
   const [syncing, setSyncing] = useState(false);
   /** Last sync failure. With data on screen → per-section chips; without → page banner. */
   const [syncError, setSyncError] = useState<string | null>(null);
+  /** Last failed manual-layer save (goals/overrides/SDRs) — never fail silently. */
+  const [storeError, setStoreError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   // Scroll-aware nav indicator: a section is "current" while it overlaps a thin
@@ -195,12 +197,22 @@ export default function Dashboard() {
   }, [load]);
 
   const patchStore = useCallback(async (body: object) => {
-    const res = await fetch("/api/store", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) setStore(await res.json());
+    try {
+      const res = await fetch("/api/store", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setStore(await res.json());
+        setStoreError(null);
+      } else {
+        const detail = (await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`;
+        setStoreError(detail);
+      }
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : "Network error");
+    }
   }, []);
 
   const ctx = useMemo(
@@ -312,6 +324,21 @@ export default function Dashboard() {
           <p className="rise border border-warn/40 bg-warn-soft px-4 py-2.5 text-xs text-ink-soft">
             <strong className="font-bold text-warn">Showing last good sync.</strong> Live fetch failed:{" "}
             {payload.error ?? "unknown error"}. Numbers reflect the previous sync — hit Refresh to retry.
+          </p>
+        )}
+        {storeError && (
+          <p className="flex items-center justify-between gap-3 border border-bad/40 bg-bad-soft px-4 py-2.5 text-xs text-bad" role="alert">
+            <span>
+              <strong className="font-bold">{"Couldn't save:"}</strong> {storeError} — your change was not stored.
+            </span>
+            <button
+              type="button"
+              onClick={() => setStoreError(null)}
+              aria-label="Dismiss"
+              className="shrink-0 font-bold hover:opacity-70"
+            >
+              ✕
+            </button>
           </p>
         )}
         {syncError && !payload && (

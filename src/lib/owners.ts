@@ -62,6 +62,8 @@ export function sdrOwnerOf(dealSdrs: Record<string, string>): (deal: Deal) => Ow
 
 export interface OwnerRow {
   owner: OwnerInfo;
+  /** Currently-open deals attributed to this owner — "how many they own" right now. */
+  openDeals: number;
   sals: number;
   sqls: number;
   deepdives: number;
@@ -88,6 +90,7 @@ export function ownerRollup(
     const k = headlineKpis(mine, t12m.cur, t12m.prior);
     return {
       owner,
+      openDeals: mine.filter((d) => d.isOpen).length,
       sals: enteredInPeriod(mine, "sal", period).count,
       sqls: enteredInPeriod(mine, "sql", period).count,
       deepdives: enteredInPeriod(mine, "deepdive", period).count,

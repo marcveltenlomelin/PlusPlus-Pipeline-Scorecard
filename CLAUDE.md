@@ -15,7 +15,9 @@ verified @plusplus.co Workspace accounts.
 - Tailwind CSS **4.1** — theme tokens via `@theme` in `src/app/globals.css`, no tailwind.config
 - Recharts **2.15** (FunnelTrend line chart, Trends bar chart)
 - Auth.js / next-auth **5 beta** with Google OAuth (`src/auth.ts`, `src/middleware.ts`)
-- No database: JSON files in `data/` (gitignored). Deployed on Vercel.
+- No database. Manual-layer store: **Vercel Blob** in production (immutable versioned
+  `store/*.json`, newest wins), `data/store.json` (gitignored) when the blob token is
+  absent. Deals cache: JSON in `data/`. Deployed on Vercel.
 
 ## Run / build / check
 
@@ -31,7 +33,9 @@ MCP screenshots — see `tests/visual/README.md`.
 
 Env vars (`.env.local`, never committed): `HUBSPOT_TOKEN` (without it the app runs in demo
 mode with seeded synthetic data), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
-(Google sign-in). Same vars are set on Vercel Production.
+(Google sign-in). Same vars are set on Vercel Production, plus `BLOB_READ_WRITE_TOKEN`
+(store `pipeline-store`, all Vercel envs) which switches the manual store to Vercel Blob —
+leave it out of `.env.local` unless you *want* local dev writing to the production store.
 
 ## Data flow (HubSpot → UI)
 
@@ -44,8 +48,11 @@ mode with seeded synthetic data), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_
 3. `/api/deals` returns the normalized `DealsPayload`; `?refresh=1` forces a live fetch.
 4. `src/lib/metrics.ts` = pure functions over `Deal[]` (entries per period, trailing-90-day
    conversion cohorts, close rate, straight-line pace projections).
-5. Manual layer: `/api/store` GET/PATCH persists goals + per-cell overrides to
-   `data/store.json`. Override IDs follow `domain:stage:period` (e.g. `tp:sal:2026-06`).
+5. Manual layer: `/api/store` GET/PATCH persists goals + per-cell overrides + SDR
+   attribution via `src/lib/store.ts`. With `BLOB_READ_WRITE_TOKEN` set it writes Vercel
+   Blob (each write = a new immutable `store/<ms>-<rand>.json` version, reads
+   list-and-take-newest, prune keeps the latest 5); without it, `data/store.json`.
+   Override IDs follow `domain:stage:period` (e.g. `tp:sal:2026-06`).
 
 ## Conventions observed
 
@@ -86,8 +93,21 @@ mode with seeded synthetic data), `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_
   many components.
 - **Chart colors in `FunnelTrend.tsx` are JS constants** duplicating the CSS tokens — if you
   change a token in `globals.css`, update them too.
-- **`data/` persistence is ephemeral on Vercel** (filesystem resets per deploy/instance) —
-  known limitation; don't silently "fix" it, it needs a real decision (KV/blob store).
+- **The manual store is Vercel Blob-backed in production** (decided 2026-06-10 after
+  silent write failures — the serverless filesystem is read-only). `src/lib/store.ts`
+  switches on `BLOB_READ_WRITE_TOKEN`: present → immutable versioned blobs under
+  `store/` (each write a new `<ms>-<rand>.json`, reads list-and-take-newest — never
+  overwrite a fixed pathname, the Blob CDN serves stale for up to 60s); absent →
+  `data/store.json` file for dependency-free local dev. Blob read errors must
+  propagate (defaulting would let the next PATCH wipe real data), and `/api/store`
+  must keep returning JSON errors — failed saves surface in the UI banner, never
+  silently no-op. Why Blob: first-party and the store (`pipeline-store`) was already
+  provisioned; Vercel KV no longer exists (folded into Marketplace/Upstash, Dec 2024);
+  Upstash Redis is the upgrade path if multi-writer concurrency ever matters
+  (today: whole-document last-write-wins, fine for a single-operator tool). The
+  store is public-access (immutable choice): URLs are unguessable but unauthenticated —
+  recreate with `--access private` + SDK `get()` if goals/SDR data ever needs real
+  secrecy.
 - **Counts are stage entries, not board occupancy** — don't "fix" the mismatch with the
   HubSpot board view.
 - **Never commit `.env.local`** (HubSpot token + OAuth secrets) or anything in `data/`.

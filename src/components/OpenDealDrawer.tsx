@@ -111,9 +111,13 @@ export default function OpenDealDrawer({ deal, sdrs, sdr, onAssignSdr, onClose }
               onChange={(e) => onAssignSdr(e.target.value || null)}
               aria-label="Sourcing SDR"
               title="Who sourced this deal — managed in the dashboard, not HubSpot"
-              className="border border-rule bg-paper px-1.5 py-1 text-xs text-ink-soft focus:border-accent focus:outline-none"
+              className={
+                sdr
+                  ? "border border-transparent bg-transparent px-1 py-1 text-xs text-ink-soft hover:border-rule focus:border-accent focus:outline-none"
+                  : "border border-dashed border-rule-dark bg-transparent px-1.5 py-1 text-xs text-ink-faint hover:border-accent hover:text-accent focus:border-accent focus:outline-none"
+              }
             >
-              <option value="">— unassigned</option>
+              <option value="">+ SDR</option>
               {sdrs.map((s) => (
                 <option key={s} value={s}>
                   {s}

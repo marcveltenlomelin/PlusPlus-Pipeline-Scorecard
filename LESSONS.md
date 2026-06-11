@@ -345,3 +345,35 @@ what to do next time. Read this file before starting any new task.
   deploy** (the documented known limitation, now carrying hand-entered attribution, not
   just goal tweaks). Recommended to Marc: make the KV/Blob decision before the team
   relies on assignments. Do NOT silently move storage (CLAUDE.md).
+
+### 2026-06-10 · Durable Blob store + silent-save fix + SDR UI polish (main)
+
+- **Root cause of "adding an SDR doesn't work"**: Vercel's serverless FS is
+  **read-only** — every production `/api/store` PATCH (SDRs, goals, overrides) threw on
+  `fs.writeFile` since day one, and the client's `if (res.ok)` swallowed it. Local dev
+  always worked, production never did. Lesson: any "works locally, dead in prod" write
+  bug on Vercel — suspect the filesystem first.
+- **Fix**: `store.ts` switches on `BLOB_READ_WRITE_TOKEN` → Vercel Blob with **immutable
+  versioned writes** (`store/<zero-padded-ms>-<rand>.json`, reads list-and-take-newest,
+  prune keeps 5 as undo history). Never overwrite a fixed blob pathname — the Blob CDN
+  serves stale up to 60s and `?v=` only busts browser caches. Blob **read errors
+  propagate** (defaulting would let the next PATCH wipe real data). Plus: `/api/store`
+  returns JSON errors; Dashboard shows a dismissible "Couldn't save" banner (verified by
+  forcing a 500 — the failed add correctly did NOT appear).
+- **Provisioning gotchas**: (1) `vercel blob create-store` without `--yes` hangs on an
+  interactive link prompt; with `--yes` it links AND **overwrites `.env.local`** —
+  HUBSPOT_TOKEN/AUTH_* were lost locally (prod unaffected; they live in Vercel envs).
+  Recovery via `vercel env pull --environment=production` is a prod-secrets dump (auto
+  mode blocks it, correctly) — Marc re-adds the lines by hand; placeholders documented
+  in the file. **Back up .env.local before any Vercel CLI command that touches envs.**
+  (2) `vercel blob del` takes no `--yes` and doesn't prompt; `get` needs `--access`.
+- **UI**: By SDR gained an "Open deals" column (owned-now count — period columns read 0
+  for older deals and looked broken without it); table/drawer SDR selects show the
+  avatar chip + quiet "+ SDR" affordance; dropdown gained a ROSTER label, right-aligned
+  mono counts, and keeps input focus after Enter (verified with real keyboard — synthetic
+  KeyboardEvents to React inputs are flaky, use Playwright's real typing for keydown
+  paths).
+- **Policy** (CLAUDE.md): keep `BLOB_READ_WRITE_TOKEN` out of `.env.local` — local dev
+  on the file backend, production on Blob; with the token present, local dev writes the
+  PRODUCTION store. Blob e2e verified: UI add → versioned blob via `vercel blob list` →
+  GET reads newest; test data removed after.

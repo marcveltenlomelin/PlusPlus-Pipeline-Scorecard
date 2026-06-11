@@ -51,7 +51,11 @@ interface OwnerBreakdownProps {
   onSelectOwner: (id: string | null) => void;
 }
 
-const NUM_COLS: { key: keyof Pick<OwnerRow, "sals" | "sqls" | "deepdives" | "pilots" | "won">; label: string }[] = [
+const NUM_COLS: {
+  key: keyof Pick<OwnerRow, "openDeals" | "sals" | "sqls" | "deepdives" | "pilots" | "won">;
+  label: string;
+}[] = [
+  { key: "openDeals", label: "Open deals" },
   { key: "sals", label: "SALs" },
   { key: "sqls", label: "SQLs" },
   { key: "deepdives", label: "Deep Dives" },
@@ -103,7 +107,7 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
 
   return (
     <div className="overflow-x-auto border border-rule bg-panel shadow-card">
-      <table className="w-full min-w-[44rem] text-sm">
+      <table className="w-full min-w-[48rem] text-sm">
         <thead>
           <tr className="border-b border-rule text-left">
             <th className="microlabel px-5 py-2.5 font-semibold">Owner</th>

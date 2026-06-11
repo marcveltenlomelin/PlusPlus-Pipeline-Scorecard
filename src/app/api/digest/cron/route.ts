@@ -6,7 +6,8 @@ import { patchStore, readStore } from "@/lib/store";
 export const dynamic = "force-dynamic";
 
 /**
- * Vercel cron entry (fires weekly, Mon ~8am PT). Public path in the middleware
+ * Vercel cron entry (fires weekly, Tue ~8am PT — before the pipeline call).
+ * Public path in the middleware
  * but self-protected: requires the CRON_SECRET bearer Vercel attaches to cron
  * invocations. Cadence (weekly/biweekly/monthly) is enforced here against the
  * store's lastSentAt, so one cron serves all three settings.

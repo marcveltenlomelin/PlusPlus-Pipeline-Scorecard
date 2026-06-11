@@ -59,6 +59,33 @@ describe("buildDigest", () => {
   });
 });
 
+describe("buildDigest — By SDR weekly block", () => {
+  it("credits this week's entries per SDR, shows roster zeros, buckets unassigned", () => {
+    const milosDeal = deal({
+      id: "m1",
+      sdr: "Milos",
+      createdAt: NOW - 1 * DAY, // this week (Wed; week starts Mon)
+      entered: { sal: NOW - 1 * DAY, sql: NOW - 1 * DAY },
+    });
+    const oldMilosDeal = deal({
+      id: "m2",
+      sdr: "Milos",
+      createdAt: NOW - 30 * DAY, // last month — not this week's numbers
+      entered: { sal: NOW - 30 * DAY },
+    });
+    const unattributed = deal({ id: "u1", createdAt: NOW - 1 * DAY, entered: { sal: NOW - 1 * DAY } });
+    const d = buildDigest([milosDeal, oldMilosDeal, unattributed], STAGE_GOALS, NOW, "full", true, ["Milos", "Daniela"]);
+    const milos = d.sdrs.find((s) => s.name === "Milos")!;
+    expect(milos.sals).toBe(1);
+    expect(milos.sqls).toBe(1);
+    expect(milos.pipe).toBe("$50K");
+    const daniela = d.sdrs.find((s) => s.name === "Daniela")!;
+    expect(daniela.sals).toBe(0); // roster name shows even with a zero week
+    const un = d.sdrs.find((s) => s.name === "Unassigned")!;
+    expect(un.sals).toBe(1);
+  });
+});
+
 describe("shouldSendNow", () => {
   it("always sends when never sent", () => {
     expect(shouldSendNow("weekly", undefined, NOW)).toBe(true);

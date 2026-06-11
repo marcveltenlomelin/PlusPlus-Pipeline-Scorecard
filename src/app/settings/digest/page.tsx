@@ -5,15 +5,16 @@ import Link from "next/link";
 import { defaultDigest, type DigestCadence, type DigestConfig, type DigestSection, type Store } from "@/lib/types";
 
 const CADENCES: { value: DigestCadence; label: string; hint: string }[] = [
-  { value: "weekly", label: "Weekly", hint: "Mondays · 8am PT (default)" },
-  { value: "biweekly", label: "Bi-weekly", hint: "every other Monday" },
-  { value: "monthly", label: "Monthly", hint: "first Monday of the month" },
+  { value: "weekly", label: "Weekly", hint: "Tuesdays · 8am PT, before the pipeline call (default)" },
+  { value: "biweekly", label: "Bi-weekly", hint: "every other Tuesday" },
+  { value: "monthly", label: "Monthly", hint: "first Tuesday of the month" },
 ];
 
 const SECTIONS: { key: DigestSection; label: string }[] = [
   { key: "headline", label: "Headline KPIs" },
   { key: "focus", label: "Today's Focus" },
   { key: "funnel", label: "Funnel" },
+  { key: "sdr", label: "By SDR (weekly)" },
   { key: "leaks", label: "Leaks" },
   { key: "revenue", label: "Revenue" },
   { key: "stale", label: "Stale deals" },

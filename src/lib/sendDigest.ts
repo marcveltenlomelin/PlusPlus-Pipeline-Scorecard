@@ -50,7 +50,7 @@ export async function sendDigest(recipients?: string[]): Promise<{ subject: stri
   let subject = "";
   const results: SendResult[] = [];
   for (const email of to) {
-    const data = buildDigest(payload.deals, store.goals, now, variantFor(email), payload.pilotTracked);
+    const data = buildDigest(payload.deals, store.goals, now, variantFor(email), payload.pilotTracked, store.sdrs);
     subject = data.subject;
     const html = await render(
       DigestEmail({ data, appUrl: APP_URL, unsubscribeUrl: unsubscribeUrl(email), sections: store.digest.sections })

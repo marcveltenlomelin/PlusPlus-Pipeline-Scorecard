@@ -59,7 +59,7 @@ export interface Override {
 export type DigestCadence = "weekly" | "biweekly" | "monthly";
 
 /** Email-digest section toggles, in render order. */
-export type DigestSection = "headline" | "focus" | "funnel" | "leaks" | "revenue" | "stale";
+export type DigestSection = "headline" | "focus" | "funnel" | "sdr" | "leaks" | "revenue" | "stale";
 
 export interface DigestConfig {
   recipients: string[];
@@ -74,7 +74,7 @@ export function defaultDigest(): DigestConfig {
   return {
     recipients: [],
     cadence: "weekly",
-    sections: { headline: true, focus: true, funnel: true, leaks: true, revenue: true, stale: true },
+    sections: { headline: true, focus: true, funnel: true, sdr: true, leaks: true, revenue: true, stale: true },
   };
 }
 

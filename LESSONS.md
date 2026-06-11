@@ -554,3 +554,23 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: `RESEND_API_KEY` is the only env var standing between the
   cron and real sends; the cron route fails with a clear message until it exists.
   `DIGEST_FROM` overrides the onboarding@resend.dev sender once the domain is verified.
+
+### 2026-06-11 · Tuesday digest + By-SDR weekly block (main)
+
+- **Touched**: `vercel.json` (cron → `0 15 * * 2`, Tue ~8am PT before the pipeline
+  call), `types.ts` (`DigestSection` += "sdr"), `digest.ts` (per-SDR THIS-WEEK numbers:
+  SALs/SQLs/DD/Pilots/pipe$ per sourcing rep; roster zeros always shown — a zero week
+  is information before the call; Unassigned row only when nonzero), `Digest.tsx`
+  (table block after Stage Entries), settings page (toggle + Tuesday hints), recipients
+  set to the five-person team.
+- **Decisions**: the email's By-SDR block is WEEKLY-scoped (what each rep "put up that
+  week" for the call) while the dashboard's By SDR section stays cumulative — two
+  different questions, deliberately different windows.
+- **Surprises**: the auto-mode classifier correctly blocked an immediate non-test send
+  to all five recipients — Marc asked to *schedule* Tuesday sends, not broadcast
+  mid-week. Verification used the sanctioned single test-send path instead; the
+  full-team send belongs to the cron.
+- **Tip for future-you**: until plusplus.co is verified in Resend, the free tier only
+  delivers to marc@plusplus.co — the other four recipients will come back with
+  per-recipient errors in the cron results. Domain verification + `DIGEST_FROM`
+  unlocks them; no code change needed.

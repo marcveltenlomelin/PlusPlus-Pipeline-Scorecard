@@ -97,6 +97,33 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
             </>
           )}
 
+          {sections.sdr && data.sdrs.length > 0 && (
+            <>
+              <SectionTitle>By SDR · this week</SectionTitle>
+              <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
+                <table width="100%" cellPadding={0} cellSpacing={0}>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: "8px 0 4px", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: FAINT }}>SDR</td>
+                      {["SALS", "SQLS", "DD", "PILOTS", "PIPE $"].map((h) => (
+                        <td key={h} align="right" style={{ padding: "8px 0 4px", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: FAINT }}>{h}</td>
+                      ))}
+                    </tr>
+                    {data.sdrs.map((s, i) => (
+                      <tr key={i}>
+                        <td style={{ padding: "7px 0", fontSize: 13, fontWeight: s.name === "Unassigned" ? 400 : 600, color: s.name === "Unassigned" ? FAINT : INK, borderTop: `1px solid ${RULE}` }}>{s.name}</td>
+                        {[s.sals, s.sqls, s.deepdives, s.pilots].map((n, j) => (
+                          <td key={j} align="right" style={{ padding: "7px 0", fontFamily: mono, fontSize: 13, fontWeight: n > 0 ? 700 : 400, color: n > 0 ? INK : FAINT, borderTop: `1px solid ${RULE}` }}>{n}</td>
+                        ))}
+                        <td align="right" style={{ padding: "7px 0", fontFamily: mono, fontSize: 13, borderTop: `1px solid ${RULE}` }}>{s.pipe}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Section>
+            </>
+          )}
+
           {sections.revenue && (
             <>
               <SectionTitle>Revenue</SectionTitle>

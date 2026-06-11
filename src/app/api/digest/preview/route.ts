@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const variant: DigestVariant = req.nextUrl.searchParams.get("variant") === "aggregate" ? "aggregate" : "full";
   const [{ payload }, store] = await Promise.all([getDeals(), readStore()]);
-  const data = buildDigest(payload.deals, store.goals, Date.now(), variant, payload.pilotTracked);
+  const data = buildDigest(payload.deals, store.goals, Date.now(), variant, payload.pilotTracked, store.sdrs);
   const html = await render(
     DigestEmail({
       data,

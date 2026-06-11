@@ -23,6 +23,8 @@ export interface DigestData {
   focus: { category: string; diagnosis: string; action: string; href: string }[];
   kpis: { label: string; value: string; detail: string }[];
   funnel: { stage: string; count: number; goal: number | null; pace: string | null }[];
+  /** Per-SDR numbers for THIS WEEK — what each sourcing rep put up before the pipeline call. */
+  sdrs: { name: string; sals: number; sqls: number; deepdives: number; pilots: number; pipe: string }[];
   stale: { rows: { name: string; stage: string; days: number; value: string }[]; count: number; totalValue: string };
   revenue: { label: string; value: string }[];
 }
@@ -50,7 +52,9 @@ export function buildDigest(
   goals: Record<GoalStage, StageGoal>,
   now: number,
   variant: DigestVariant,
-  pilotTracked: boolean
+  pilotTracked: boolean,
+  /** Roster names always shown (a zero week is information before the call). */
+  sdrRoster: string[] = []
 ): DigestData {
   const year = new Date(now).getFullYear();
   const yearStart = new Date(year, 0, 1).getTime();
@@ -114,6 +118,38 @@ export function buildDigest(
       };
     });
 
+  // --- By SDR (this week) -----------------------------------------------------
+  // Weekly sourcing scoreboard for the pipeline call: every roster name shows
+  // even at zero; names found on deals but missing from the roster show too;
+  // Unassigned only appears when something slipped through this week.
+  const sdrNames = [...new Set([...sdrRoster, ...deals.map((d) => d.sdr).filter((s): s is string => !!s)])];
+  const weekly = (mine: Deal[], stage: GoalStage) => enteredInPeriod(mine, stage, weekKey).count;
+  const sdrs = sdrNames
+    .map((name) => {
+      const mine = deals.filter((d) => d.sdr === name);
+      return {
+        name,
+        sals: weekly(mine, "sal"),
+        sqls: weekly(mine, "sql"),
+        deepdives: weekly(mine, "deepdive"),
+        pilots: weekly(mine, "pilot"),
+        pipe: money(enteredInPeriod(mine, "sql", weekKey).totalValue),
+      };
+    })
+    .sort((a, b) => b.sals - a.sals || a.name.localeCompare(b.name));
+  const unassigned = deals.filter((d) => !d.sdr);
+  const unassignedSals = weekly(unassigned, "sal");
+  if (unassignedSals > 0) {
+    sdrs.push({
+      name: "Unassigned",
+      sals: unassignedSals,
+      sqls: weekly(unassigned, "sql"),
+      deepdives: weekly(unassigned, "deepdive"),
+      pilots: weekly(unassigned, "pilot"),
+      pipe: money(enteredInPeriod(unassigned, "sql", weekKey).totalValue),
+    });
+  }
+
   // --- Stale block --------------------------------------------------------------
   const staleEntries = staleDeals(deals, now);
   const stale = {
@@ -147,7 +183,7 @@ export function buildDigest(
         : `${fmtNum(enteredInPeriod(deals, "sal", weekKey).count)} new SALs this week`;
   const subject = `PlusPlus Pipeline · Week of ${weekLabel} · ${headline}`;
 
-  return { subject, weekLabel, variant, focus, kpis, funnel, stale, revenue };
+  return { subject, weekLabel, variant, focus, kpis, funnel, sdrs, stale, revenue };
 }
 
 /** Aggregate variant: replace any deal name appearing in text with a neutral phrase. */

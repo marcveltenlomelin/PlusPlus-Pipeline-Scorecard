@@ -1,4 +1,12 @@
-import { ARR_TARGET, AT_RISK_THRESHOLD, NET_NEW_OPP_STAGE, TRAILING_WINDOW_DAYS } from "./config";
+import {
+  ARR_TARGET,
+  AT_RISK_THRESHOLD,
+  NET_NEW_OPP_STAGE,
+  STAGE_WIN_PROBABILITY,
+  STAGE_WIN_PROBABILITY_DEFAULT,
+  TRAILING_WINDOW_DAYS,
+} from "./config";
+import { matchStageKey } from "./stale";
 import {
   elapsedFraction,
   granularityOf,
@@ -143,6 +151,32 @@ export function pacingBadge(
 export function openPipeline(deals: Deal[], enteredStage: StageKey): StageCount {
   const hits = deals.filter((d) => d.isOpen && d.entered[enteredStage] !== undefined);
   return { count: hits.length, totalValue: hits.reduce((s, d) => s + d.value, 0), deals: hits };
+}
+
+/**
+ * Forecast weight of a deal: closed-won counts in full, closed-lost not at
+ * all, and open deals by their current stage's win probability (unmatched
+ * open stages — e.g. On Hold — get the configurable default, never zero).
+ */
+export function dealForecastWeight(deal: Deal): number {
+  if (!deal.isOpen) return deal.entered.won !== undefined ? 1 : 0;
+  const key = matchStageKey(deal.stageLabel);
+  return key ? STAGE_WIN_PROBABILITY[key] : STAGE_WIN_PROBABILITY_DEFAULT;
+}
+
+/** Σ value × forecast weight over a deal set — the expected-value lens. */
+export function weightedValue(deals: Deal[]): number {
+  return deals.reduce((s, d) => s + d.value * dealForecastWeight(d), 0);
+}
+
+/** The Weighted Pipeline tile: the whole open book, raw and weighted. */
+export function weightedPipeline(deals: Deal[]): { rawOpen: number; weightedOpen: number; openDeals: Deal[] } {
+  const open = deals.filter((d) => d.isOpen);
+  return {
+    rawOpen: open.reduce((s, d) => s + d.value, 0),
+    weightedOpen: weightedValue(open),
+    openDeals: open,
+  };
 }
 
 export interface PipelineCoverage {

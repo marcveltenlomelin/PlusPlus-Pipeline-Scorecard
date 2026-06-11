@@ -455,3 +455,27 @@ what to do next time. Read this file before starting any new task.
   period toggle (verified in Playwright by toggling MONTH→QUARTER and diffing the
   table). Don't "fix" it back to period-scoped; the per-period stage view already
   exists — it's the Stage Entries scoreboard with the SDR filter applied.
+
+### 2026-06-11 · Weighted pipeline metric (main)
+
+- **Touched**: `config.ts` (`STAGE_WIN_PROBABILITY` 5/15/35/60% + 5% default for
+  unmatched open stages incl. On Hold, `DEFINITIONS["rev:weighted"]`), `stale.ts`
+  (exported `matchStageKey` — one stage-label classifier now serves stale thresholds AND
+  forecast weights), `metrics.ts` (`dealForecastWeight` won=1/lost=0/open=stage prob,
+  `weightedValue`, `weightedPipeline`), `metrics.test.ts` (+4), `Revenue.tsx` (6-col
+  grid, Weighted Pipeline tile after YTD, Raw $/Weighted $ segmented toggle).
+- **Decisions**: the tile weights the WHOLE open book (SAL has a weight, and SAL-stage
+  deals only exist there) — deliberately broader than the Coverage tile's SQL-entered
+  "open pipeline"; the tooltip spells out both set and weights. The toggle swaps the
+  value basis of the pipeline tiles via one weight fn (weighted "Pipeline created" =
+  expected value of the cohort: wins full, losses zero, open by stage). Closed Won is
+  weight-1 by definition; Projected ARR keeps its close-rate model (re-weighting would
+  double-count). Metric override ids get a `:w` suffix in weighted mode so manual
+  overrides can't cross modes.
+- **Surprises**: none — the live tile matched the hand-computed expectation to the
+  dollar ($135.5K vs $136K displayed) on first render: 28 open deals, 18 SAL-heavy →
+  weighted ≈ 10% of raw ($1.33M → $136K). Forecast and activity views now visibly
+  disagree by ~10× — which is the whole point of the feature.
+- **Tip for future-you**: `dealForecastWeight` is the single forecast lens — if Marc
+  ever wants weighted versions of other $ metrics (e.g. By SDR pipe $), wrap the same
+  fn; don't invent a second weighting.

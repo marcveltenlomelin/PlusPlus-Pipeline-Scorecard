@@ -18,6 +18,8 @@ import {
   openPipeline,
   pipelineCoverage,
   valueEnteredBetween,
+  weightedPipeline,
+  weightedValue,
 } from "@/lib/metrics";
 import {
   AGE_BUCKETS,
@@ -85,6 +87,8 @@ function Tile({
 
 export default function Revenue(p: RevenueProps) {
   const { openDrill, now } = useDash();
+  // Raw $ = activity view; Weighted $ = forecast view (value × stage win probability)
+  const [weighted, setWeighted] = useState(false);
   const phrase = periodPhrase(p.period, now);
   const year = new Date(now).getFullYear();
   const yearStart = new Date(year, 0, 1).getTime();
@@ -104,24 +108,57 @@ export default function Revenue(p: RevenueProps) {
 
   const money = (n: number) => fmtMoney(n, { compact: true });
 
+  // weighted lens: the pipeline-value tiles swap to expected value; closed-won
+  // is identical either way (weight 1) and Projected ARR keeps its own
+  // close-rate model (weighting it again would double-count probability)
+  const wpipe = weightedPipeline(p.deals);
+  const pipePeriodValue = weighted ? weightedValue(pipePeriod.deals) : pipePeriod.totalValue;
+  const pipeYtdValue = weighted ? weightedValue(pipeYtd.deals) : pipeYtd.totalValue;
+  const wTag = weighted ? " · weighted" : "";
+
   const coverage = pipelineCoverage(p.deals, p.granularity, now);
+  const coverageOpen = weighted ? weightedValue(open.deals) : coverage.open;
+  const coverageRatio = coverage.remaining > 0 ? coverageOpen / coverage.remaining : null;
   const coverageColor =
-    coverage.ratio === null || coverage.ratio >= COVERAGE_TARGET
+    coverageRatio === null || coverageRatio >= COVERAGE_TARGET
       ? "text-good"
-      : coverage.ratio >= COVERAGE_WARN
+      : coverageRatio >= COVERAGE_WARN
         ? "text-warn"
         : "text-bad";
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div>
+      <div className="mb-3 flex justify-end">
+        <div role="group" aria-label="Pipeline value basis" className="flex border border-rule-dark">
+          {([false, true] as const).map((w) => (
+            <button
+              key={String(w)}
+              type="button"
+              aria-pressed={weighted === w}
+              onClick={() => setWeighted(w)}
+              title={
+                w
+                  ? "Forecast view: every pipeline $ × its stage win probability"
+                  : "Activity view: raw deal values"
+              }
+              className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
+                weighted === w ? "bg-ink text-paper" : "text-ink-soft hover:bg-paper"
+              }`}
+            >
+              {w ? "Weighted $" : "Raw $"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Tile
-          label={`Pipeline created · ${phrase}`}
+          label={`Pipeline created · ${phrase}${wTag}`}
           def={DEFINITIONS["rev:pipeline"]}
           foot={`target ${money(periodTarget)} at $200K/mo pace · ${pipePeriod.count} opps`}
         >
           <Metric
-            id={`rev:pipeline:${p.period}`}
-            live={pipePeriod.totalValue}
+            id={`rev:pipeline:${p.period}${weighted ? ":w" : ""}`}
+            live={pipePeriodValue}
             format={money}
             onDrill={() =>
               openDrill({
@@ -136,14 +173,14 @@ export default function Revenue(p: RevenueProps) {
         </Tile>
 
         <Tile
-          label={`Pipeline created · ${year} YTD`}
+          label={`Pipeline created · ${year} YTD${wTag}`}
           def={DEFINITIONS["rev:pipelineYtd"]}
-          bar={{ value: pipeYtd.totalValue, target: ytdPaceTarget }}
+          bar={{ value: pipeYtdValue, target: ytdPaceTarget }}
           foot={`pace target to date ${money(ytdPaceTarget)}`}
         >
           <Metric
-            id={`rev:pipelineYtd:${year}`}
-            live={pipeYtd.totalValue}
+            id={`rev:pipelineYtd:${year}${weighted ? ":w" : ""}`}
+            live={pipeYtdValue}
             format={money}
             onDrill={() =>
               openDrill({
@@ -155,6 +192,32 @@ export default function Revenue(p: RevenueProps) {
               })
             }
           />
+        </Tile>
+
+        <Tile
+          label="Weighted Pipeline"
+          def={DEFINITIONS["rev:weighted"]}
+          foot={
+            <>
+              <button
+                type="button"
+                className="underline decoration-rule-dark underline-offset-2 hover:text-accent"
+                onClick={() =>
+                  openDrill({
+                    title: "Open deals — the weighted set",
+                    subtitle: DEFINITIONS["rev:weighted"],
+                    deals: wpipe.openDeals,
+                    dateLabel: "Created",
+                  })
+                }
+              >
+                {money(wpipe.rawOpen)} open
+              </button>{" "}
+              · {money(wpipe.weightedOpen)} weighted
+            </>
+          }
+        >
+          <Metric id="rev:weightedPipe" live={wpipe.weightedOpen} format={money} />
         </Tile>
 
         <Tile
@@ -209,7 +272,7 @@ export default function Revenue(p: RevenueProps) {
         </Tile>
 
         <Tile
-          label={`Pipeline Coverage · Remaining ${coverage.scopeLabel}`}
+          label={`Pipeline Coverage · Remaining ${coverage.scopeLabel}${wTag}`}
           def={DEFINITIONS["rev:coverage"]}
           foot={
             <>
@@ -226,16 +289,17 @@ export default function Revenue(p: RevenueProps) {
                   })
                 }
               >
-                {money(coverage.open)} open
+                {money(coverageOpen)} open
               </button>{" "}
               ÷ {money(coverage.remaining)} remaining quota · target ≥ {COVERAGE_TARGET.toFixed(1)}x
             </>
           }
         >
           <span className={coverageColor}>
-            {coverage.ratio === null ? "Met" : `${coverage.ratio.toFixed(1)}x`}
+            {coverageRatio === null ? "Met" : `${coverageRatio.toFixed(1)}x`}
           </span>
         </Tile>
+      </div>
     </div>
   );
 }

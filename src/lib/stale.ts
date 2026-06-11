@@ -42,11 +42,20 @@ export function daysInStage(deal: Deal, now: number): number {
   return Math.max(0, Math.floor((now - last) / MS_DAY));
 }
 
-function thresholdFor(stageLabel: string): number {
+/**
+ * Classify a free-form current-stage label to a funnel stage key. Shared by
+ * stale thresholds and forecast weighting — one classification, two consumers.
+ */
+export function matchStageKey(stageLabel: string): keyof typeof STALE_THRESHOLDS | null {
   for (const [key, re] of STALE_STAGE_MATCHERS) {
-    if (re.test(stageLabel)) return STALE_THRESHOLDS[key];
+    if (re.test(stageLabel)) return key;
   }
-  return STALE_DEFAULT_THRESHOLD;
+  return null;
+}
+
+function thresholdFor(stageLabel: string): number {
+  const key = matchStageKey(stageLabel);
+  return key ? STALE_THRESHOLDS[key] : STALE_DEFAULT_THRESHOLD;
 }
 
 export function dealStaleness(deal: Deal, now: number): DealStaleness {

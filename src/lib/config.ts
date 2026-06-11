@@ -87,6 +87,19 @@ export const CLOSE_RATE_TARGET = 0.5;
 export const COVERAGE_TARGET = 3.0; // healthy SaaS benchmark
 export const COVERAGE_WARN = 2.0; // below this = need more top-of-funnel
 
+/* ── Stage win probabilities (weighted pipeline) ──────────────────────── */
+
+/** Forecast weight of an open deal by current stage — value × probability. */
+export const STAGE_WIN_PROBABILITY: Record<"sal" | "sql" | "deepdive" | "pilot", number> = {
+  sal: 0.05,
+  sql: 0.15,
+  deepdive: 0.35,
+  pilot: 0.6,
+};
+
+/** Open stages that don't match a funnel stage (e.g. On Hold) — parked ≈ SAL-grade. */
+export const STAGE_WIN_PROBABILITY_DEFAULT = 0.05;
+
 /* ── Stale-deal thresholds ────────────────────────────────────────────── */
 
 /** Days in stage before a deal counts as stale, per funnel stage. */
@@ -166,6 +179,8 @@ export const DEFINITIONS: Record<string, string> = {
     "Closed-won YTD + (value of currently open deals that have entered SQL) × trailing-90-day close rate. A what-if at today's close rate, not a forecast model.",
   "rev:openPipeline":
     "Value of currently open deals that have entered SQL — the live pipeline behind the projection. Deals still sitting in SAL are excluded until they convert.",
+  "rev:weighted":
+    "Open pipe weighted by historical stage conversion. Use this for forecast, raw pipe for activity. Sum over ALL open deals of value × current-stage win probability (SAL 5% · SQL 15% · Deep Dive 35% · Pilot 60% · other open stages incl. On Hold 5%). Broader set than the Coverage tile's open pipeline, which counts only deals that entered SQL.",
   "rev:coverage":
     "Open pipeline (deals that entered SQL, still open) ÷ remaining quota (the $1.2M annual target minus closed-won YTD; quarter view uses the quarter's $300K slice minus closed-won this quarter). Healthy SaaS pipelines run 3–4× coverage. Below 2× signals you need more top-of-funnel. Target ≥ 3.0×.",
   goal: "Goals come from the goal model: $1.2M ARR ÷ $50K average deal = 24 closed-won deals/year, worked backwards up the funnel (Pilot→Won 50%, Deep Dive→Pilot 80%, SQL→Deep Dive 80%, SAL→SQL 20%). Monthly, quarterly, and annual goals are set explicitly per stage and editable by hand; weekly views derive monthly × 12 ÷ 52.",

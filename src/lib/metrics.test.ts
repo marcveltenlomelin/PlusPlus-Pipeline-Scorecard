@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pipelineCoverage } from "./metrics";
+import { dealForecastWeight, pipelineCoverage, weightedPipeline, weightedValue } from "./metrics";
 import type { Deal } from "./types";
 
 const DAY = 86_400_000;
@@ -70,5 +70,48 @@ describe("pipelineCoverage", () => {
     const c = pipelineCoverage([won("w", 80, 100_000)], "month", NOW);
     expect(c.open).toBe(0);
     expect(c.ratio).toBe(0);
+  });
+});
+
+describe("dealForecastWeight / weightedValue / weightedPipeline", () => {
+  const at = (label: string, value = 100_000, over: Partial<Deal> = {}) =>
+    deal({ id: label + value, stageLabel: label, value, ...over });
+
+  it("weights open deals by current stage, with the On Hold/unmatched default", () => {
+    expect(dealForecastWeight(at("SAL (Discovery Booked)"))).toBe(0.05);
+    expect(dealForecastWeight(at("SQL (Initiative Identified)"))).toBe(0.15);
+    expect(dealForecastWeight(at("Deep Dive Demo"))).toBe(0.35);
+    expect(dealForecastWeight(at("Review / Pilot"))).toBe(0.6);
+    expect(dealForecastWeight(at("On Hold"))).toBe(0.05);
+    expect(dealForecastWeight(at("Mystery Stage"))).toBe(0.05);
+  });
+
+  it("counts closed-won in full and closed-lost not at all", () => {
+    const wonDeal = at("Closed Won", 100_000, { isOpen: false, entered: { sal: NOW - DAY, won: NOW } });
+    const lostDeal = at("Closed Lost", 100_000, { isOpen: false, entered: { sal: NOW - DAY, lost: NOW } });
+    expect(dealForecastWeight(wonDeal)).toBe(1);
+    expect(dealForecastWeight(lostDeal)).toBe(0);
+    expect(weightedValue([wonDeal, lostDeal])).toBe(100_000);
+  });
+
+  it("computes the open-book tile numbers", () => {
+    const deals = [
+      at("SAL (Discovery Booked)", 100_000), // 5K
+      at("Review / Pilot", 50_000), // 30K
+      at("Closed Won", 999_999, { isOpen: false, entered: { sal: NOW - DAY, won: NOW } }), // excluded: not open
+    ];
+    const w = weightedPipeline(deals);
+    expect(w.rawOpen).toBe(150_000);
+    expect(w.weightedOpen).toBe(35_000);
+    expect(w.openDeals).toHaveLength(2);
+  });
+
+  it("weighted cohort value = expected value (wins full, losses zero, open by stage)", () => {
+    const cohort = [
+      at("SQL (Initiative Identified)", 100_000), // 15K
+      at("Closed Won", 50_000, { isOpen: false, entered: { sal: NOW - DAY, won: NOW } }), // 50K
+      at("Closed Lost", 80_000, { isOpen: false, entered: { sal: NOW - DAY, lost: NOW } }), // 0
+    ];
+    expect(weightedValue(cohort)).toBe(65_000);
   });
 });

@@ -299,17 +299,6 @@ export default function Dashboard() {
               onRefresh={() => void load(true)}
             />
             <Section
-              title={`Headline · ${headlineWindows(now, granularity).label}`}
-              subtitle="The business in one line — win rate, cycle time, and deal size, with the prior window for contrast."
-              delay={0}
-              loading={syncing}
-              skeleton="cards"
-              error={syncError}
-              onRetry={() => void load(true)}
-            >
-              <Headline deals={payload.deals} granularity={granularity} />
-            </Section>
-            <Section
               title="Stage Entries"
               subtitle={`Deals that entered each stage ${phrase} — actual against goal, not board occupancy.`}
               delay={0}
@@ -396,6 +385,17 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <OpenDeals deals={payload.deals} />
+            </Section>
+            <Section
+              title={`Headline · ${headlineWindows(now, granularity).label}`}
+              subtitle="The business in one line — win rate, cycle time, and deal size, with the prior window for contrast."
+              delay={330}
+              loading={syncing}
+              skeleton="cards"
+              error={syncError}
+              onRetry={() => void load(true)}
+            >
+              <Headline deals={payload.deals} granularity={granularity} />
             </Section>
             <Section
               title="Revenue Math"

@@ -233,3 +233,17 @@ what to do next time. Read this file before starting any new task.
   checks stable while the title swaps between "Trailing 12 Months" and "2026 YTD".
 - **Tip for future-you**: `headlineKpis` is window-agnostic — feed it any `{start,end}`
   pair (quarterly board reviews, cohort comparisons) without touching the math.
+
+### 2026-06-10 · Headline moved above Revenue Math (main)
+
+- **Touched**: `Dashboard.tsx` only — the Headline `Section` relocated from
+  Today's-Focus-adjacent to between Open Deals and Revenue Math (owner call: with no
+  recent wins, a 0%-win-rate banner shouldn't be the second thing on the page).
+- **Surprises**: mid-verification the live portal changed under us — open deals dropped
+  52 → 28 and closed-lost jumped to 26 in the window. Someone executed the stale-deal
+  cleanup that Today's Focus prescribed hours earlier (the 800+-day On Hold block got
+  closed out). If a count looks "wrong" vs an earlier screenshot, check whether the data
+  moved before hunting a bug — this portal is live and now demonstrably acted upon.
+- **Tip for future-you**: section entrance delays are 0–360ms in 60ms steps; a relocated
+  section should take a delay matching its new slot (Headline now 330, between Open
+  Deals' 300 and Revenue Math's 360).

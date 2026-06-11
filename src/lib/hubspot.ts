@@ -24,7 +24,15 @@ import type { Deal, DealsPayload, StageKey } from "./types";
 
 const HS = "https://api.hubapi.com";
 
-const BASE_PROPS = ["dealname", "amount", "dealstage", "pipeline", "createdate", "hubspot_owner_id"];
+const BASE_PROPS = [
+  "dealname",
+  "amount",
+  "dealstage",
+  "pipeline",
+  "createdate",
+  "hubspot_owner_id",
+  "sourcing_sdr", // custom; written back by this dashboard (see setDealSdr)
+];
 
 interface PipelineStage {
   id: string;
@@ -99,11 +107,13 @@ async function fetchAllDeals(token: string, properties: string[]): Promise<Recor
     const res = await hsGet(token, `${HS}/crm/v3/objects/deals?${params}`);
     if (!res.ok) {
       const body = await res.text();
-      // Custom properties (first_pilot_date today, possibly others later) may
-      // not exist in the portal yet — drop whichever one the error names and
-      // retry instead of failing the whole sync.
+      // Custom properties (first_pilot_date, sourcing_sdr) may not exist in
+      // the portal yet — drop whichever one the error names and retry instead
+      // of failing the whole sync.
       if (res.status === 400) {
-        const missing = properties.find((p) => p.startsWith("first_") && body.includes(p));
+        const missing = properties.find(
+          (p) => (p.startsWith("first_") || p === "sourcing_sdr") && body.includes(p)
+        );
         if (missing) return fetchAllDeals(token, properties.filter((p) => p !== missing));
       }
       throw new Error(`HubSpot deals fetch failed (${res.status}): ${body.slice(0, 200)}`);
@@ -167,6 +177,7 @@ function normalize(
       name: p.dealname || `Deal ${id}`,
       ownerId,
       ownerName: ownerId ? ownerNames.get(ownerId) : undefined,
+      sdr: p.sourcing_sdr || undefined,
       amount,
       value: amount ?? DEFAULT_DEAL_VALUE,
       stageId: p.dealstage ?? "unknown",
@@ -195,6 +206,33 @@ async function writeDiskCache(data: CacheShape): Promise<void> {
   } catch {
     // cache persistence is best-effort
   }
+}
+
+/**
+ * Write the sourcing-SDR attribution back to HubSpot — the only deal write
+ * this app performs (scope: crm.objects.deals.write). Empty/null clears.
+ * Throws with detail so the dashboard's save banner can say why.
+ */
+export async function setDealSdr(dealId: string, sdr: string | null): Promise<void> {
+  const token = process.env.HUBSPOT_TOKEN;
+  if (!token) throw new Error("No HUBSPOT_TOKEN — demo mode can't write to HubSpot");
+  const res = await fetch(`${HS}/crm/v3/objects/deals/${encodeURIComponent(dealId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ properties: { sourcing_sdr: sdr ?? "" } }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`HubSpot SDR write failed (${res.status}): ${body.slice(0, 160)}`);
+  }
+  // the cached payload now disagrees with HubSpot — next read must refetch
+  invalidateDealsCache();
+}
+
+/** Drop the in-memory deals memo (e.g. after a write-back). */
+export function invalidateDealsCache(): void {
+  memo = null;
 }
 
 export async function getDeals(opts: { force?: boolean } = {}): Promise<CacheShape> {

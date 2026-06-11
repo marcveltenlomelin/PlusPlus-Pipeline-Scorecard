@@ -378,6 +378,38 @@ what to do next time. Read this file before starting any new task.
   PRODUCTION store. Blob e2e verified: UI add → versioned blob via `vercel blob list` →
   GET reads newest; test data removed after.
 
+### 2026-06-11 · SDR write-back: sourcing_sdr in HubSpot is the source of truth (main)
+
+- **Architecture flip (Option B, owner-chosen)**: SDR assignments moved OFF the Blob
+  store and onto the deal — custom HubSpot property `sourcing_sdr` (created via API
+  after Marc ticked `crm.schemas.deals.write`; he can untick it now). Dashboard writes
+  it (POST `/api/deals/sdr` → `setDealSdr`, the app's ONLY deal write under
+  `crm.objects.deals.write`) and reads it back through the normal deals fetch
+  (`Deal.sdr`). One copy of the fact; HubSpot-side edits flow in on the next sync. The
+  Blob store now holds roster/goals/overrides only; `removeSdrs` no longer unassigns
+  (deals keep attribution; rollups display whatever's on the deal — assignable list =
+  roster ∪ names on deals).
+- **Touched**: `hubspot.ts` (BASE_PROPS + sourcing_sdr in the 400-graceful-drop list,
+  `setDealSdr`, `invalidateDealsCache` — a write makes the 5-min memo stale, so null it),
+  new `app/api/deals/sdr/route.ts`, `types.ts` (Deal.sdr; Store/StorePatch slimmed),
+  `store.ts`/`store.test.ts` (contract change, tests rewritten not weakened),
+  `owners.ts` (`sdrOwnerOf` is now a plain `(deal) => OwnerInfo`), `Dashboard.tsx`
+  (assign = POST → on success patch `payload` in place; counts from deals),
+  `Revenue.tsx`/`OpenDealDrawer.tsx` (selects read `deal.sdr`; the drawer re-resolves
+  its deal from the live array by id so in-drawer assignment reflects instantly).
+- **Verified against the real CRM**: assigned "Milos" to Motive/Hanna LMS RFP via the
+  table select → direct HubSpot GET showed `sourcing_sdr: 'Milos'` → survived reload +
+  forced refresh (read-back, not local state) → By SDR rolled him up (Open deals 1) →
+  forced-500 banner with no false-optimistic select change → test assignment cleared
+  (Milos kept in the roster — real SDR). Owners scope confirmed live: the drawer now
+  shows "Owner: Michael Wallace" instead of "Owner 5837".
+- **Tips for future-you**: clearing a HubSpot text property = write `""` (it reads back
+  as empty string → normalize to `undefined`). When a server-side write changes data the
+  deals memo caches, invalidate the memo in the same call — the client's local patch
+  hides the gap, but a reload within the TTL would resurrect the old value. The UI never
+  optimistically flips a select before the 200: on failure the select stays truthful and
+  the banner explains.
+
 ### 2026-06-10 · Blob-store decision, second perspective (main) — parallel sessions
 
 - **Context**: two Claude sessions worked this task in the SAME working tree at the same

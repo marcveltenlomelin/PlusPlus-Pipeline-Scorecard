@@ -20,6 +20,8 @@ export interface Deal {
   ownerId?: string;
   /** Resolved owner name; absent when the owners API scope is missing. */
   ownerName?: string;
+  /** Sourcing SDR (custom sourcing_sdr property — written by this dashboard). */
+  sdr?: string;
   /** Raw HubSpot amount; null when not set on the deal. */
   amount: number | null;
   /** amount when set, otherwise DEFAULT_DEAL_VALUE. */
@@ -63,13 +65,11 @@ export interface Store {
   /** Manual overrides keyed by metric cell id, e.g. "tp:sal:2026-06". */
   overrides: Record<string, Override>;
   /**
-   * SDR roster — who *sourced* deals. Deliberately dashboard-native: the
-   * HubSpot owner is the deal lead (a different person), and sourcing
-   * attribution has no home in the portal. Names are the identity.
+   * SDR roster — the *assignable* sourcing names. Assignments themselves live
+   * on the deal (HubSpot custom property `sourcing_sdr`, written by this
+   * dashboard) — the roster is just the pick-list. Names are the identity.
    */
   sdrs: string[];
-  /** Deal id → sourcing SDR name. */
-  dealSdrs: Record<string, string>;
 }
 
 /** PATCH body for /api/store — additive keys only; existing shape is load-bearing. */
@@ -78,8 +78,6 @@ export interface StorePatch {
   setOverrides?: Record<string, Override>;
   clearOverrides?: string[];
   addSdrs?: string[];
-  /** Removing an SDR also unassigns their deals. */
+  /** Roster-only removal — deals keep their HubSpot-side attribution. */
   removeSdrs?: string[];
-  /** Deal id → SDR name, or null to clear the assignment. */
-  setDealSdrs?: Record<string, string | null>;
 }

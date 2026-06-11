@@ -107,7 +107,6 @@ function hydrate(raw: Partial<Store> | null): Store {
     goals: mergeGoals(raw?.goals),
     overrides: raw?.overrides ?? {},
     sdrs: raw?.sdrs ?? [],
-    dealSdrs: raw?.dealSdrs ?? {},
   };
 }
 
@@ -135,7 +134,6 @@ export function applyPatch(store: Store, patch: StorePatch): Store {
     goals: { ...store.goals },
     overrides: { ...store.overrides },
     sdrs: [...store.sdrs],
-    dealSdrs: { ...store.dealSdrs },
   };
   for (const [stage, g] of Object.entries(patch.goals ?? {}) as [
     GoalStage,
@@ -151,15 +149,9 @@ export function applyPatch(store: Store, patch: StorePatch): Store {
     if (trimmed && !next.sdrs.includes(trimmed)) next.sdrs.push(trimmed);
   }
   for (const name of patch.removeSdrs ?? []) {
+    // roster-only: assignments live on the deals (HubSpot sourcing_sdr) and
+    // keep displaying/rolling up even for removed names
     next.sdrs = next.sdrs.filter((s) => s !== name);
-    // their assignments go too — an orphaned name would be unfilterable
-    for (const [dealId, sdr] of Object.entries(next.dealSdrs)) {
-      if (sdr === name) delete next.dealSdrs[dealId];
-    }
-  }
-  for (const [dealId, sdr] of Object.entries(patch.setDealSdrs ?? {})) {
-    if (sdr === null) delete next.dealSdrs[dealId];
-    else if (next.sdrs.includes(sdr)) next.dealSdrs[dealId] = sdr;
   }
   return next;
 }

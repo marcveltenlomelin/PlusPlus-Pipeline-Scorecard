@@ -50,14 +50,12 @@ function hubspotOwnerOf(deal: Deal): OwnerInfo {
 }
 
 /**
- * Attribution selector: sourcing SDR from the manual store (dashboard-native;
- * HubSpot has no field for who sourced a deal). Names are the identity.
+ * Attribution selector: sourcing SDR, read straight off the deal (HubSpot
+ * custom property `sourcing_sdr`, written back by this dashboard). Names are
+ * the identity.
  */
-export function sdrOwnerOf(dealSdrs: Record<string, string>): (deal: Deal) => OwnerInfo {
-  return (deal) => {
-    const name = dealSdrs[deal.id];
-    return name ? { id: name, name } : { id: UNASSIGNED_ID, name: "Unassigned" };
-  };
+export function sdrOwnerOf(deal: Deal): OwnerInfo {
+  return deal.sdr ? { id: deal.sdr, name: deal.sdr } : { id: UNASSIGNED_ID, name: "Unassigned" };
 }
 
 export interface OwnerRow {

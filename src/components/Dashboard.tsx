@@ -88,7 +88,7 @@ function defaultGoals(): Store["goals"] {
 }
 
 function emptyStore(): Store {
-  return { goals: defaultGoals(), overrides: {}, sdrs: [], dealSdrs: {} };
+  return { goals: defaultGoals(), overrides: {}, sdrs: [] };
 }
 
 export default function Dashboard() {
@@ -258,25 +258,50 @@ export default function Dashboard() {
 
   const phrase = periodPhrase(period, now);
 
-  // SDR roster with owned-deal counts for the nav dropdown
+  // Assignable names = roster ∪ names already on deals (HubSpot-side edits stay
+  // selectable); counts come from the deals themselves — the source of truth.
   const sdrOptions = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const sdr of Object.values(store.dealSdrs)) counts.set(sdr, (counts.get(sdr) ?? 0) + 1);
-    return store.sdrs.map((name) => ({ name, count: counts.get(name) ?? 0 }));
-  }, [store.sdrs, store.dealSdrs]);
+    for (const d of payload?.deals ?? []) {
+      if (d.sdr) counts.set(d.sdr, (counts.get(d.sdr) ?? 0) + 1);
+    }
+    const names = [...new Set([...store.sdrs, ...counts.keys()])].sort((a, b) => a.localeCompare(b));
+    return names.map((name) => ({ name, count: counts.get(name) ?? 0 }));
+  }, [store.sdrs, payload]);
 
   // the one choke point: every section below consumes this filtered view
   const visibleDeals = useMemo(() => {
     if (!payload) return [];
     if (!sdrFilter) return payload.deals;
-    const of = sdrOwnerOf(store.dealSdrs);
-    return payload.deals.filter((d) => of(d).id === sdrFilter);
-  }, [payload, sdrFilter, store.dealSdrs]);
+    return payload.deals.filter((d) => sdrOwnerOf(d).id === sdrFilter);
+  }, [payload, sdrFilter]);
 
-  const assignSdr = useCallback(
-    (dealId: string, sdr: string | null) => void patchStore({ setDealSdrs: { [dealId]: sdr } }),
-    [patchStore]
-  );
+  /** Write the attribution through to HubSpot, then patch the local copy. */
+  const assignSdr = useCallback(async (dealId: string, sdr: string | null) => {
+    try {
+      const res = await fetch("/api/deals/sdr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealId, sdr }),
+      });
+      if (!res.ok) {
+        const detail = (await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`;
+        setStoreError(detail);
+        return;
+      }
+      setStoreError(null);
+      setPayload((prev) =>
+        prev
+          ? {
+              ...prev,
+              deals: prev.deals.map((d) => (d.id === dealId ? { ...d, sdr: sdr ?? undefined } : d)),
+            }
+          : prev
+      );
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : "Network error");
+    }
+  }, []);
 
   if (!mounted) {
     return (
@@ -442,7 +467,7 @@ export default function Dashboard() {
               <OwnerBreakdown
                 deals={payload.deals}
                 period={period}
-                ownerOf={sdrOwnerOf(store.dealSdrs)}
+                ownerOf={sdrOwnerOf}
                 selectedOwner={sdrFilter}
                 onSelectOwner={setSdrFilter}
               />
@@ -478,7 +503,11 @@ export default function Dashboard() {
               error={syncError}
               onRetry={() => void load(true)}
             >
-              <OpenDeals deals={visibleDeals} sdrs={store.sdrs} dealSdrs={store.dealSdrs} onAssignSdr={assignSdr} />
+              <OpenDeals
+                deals={visibleDeals}
+                sdrs={sdrOptions.map((s) => s.name)}
+                onAssignSdr={(dealId, sdr) => void assignSdr(dealId, sdr)}
+              />
             </Section>
             <Section
               title={`Headline · ${headlineWindows(now, granularity).label}`}

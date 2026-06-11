@@ -316,13 +316,13 @@ const FILTER_CTRL =
 
 interface OpenDealsProps {
   deals: Deal[];
-  /** SDR roster + assignments (sourcing attribution — managed in the nav dropdown). */
+  /** Assignable sourcing names (roster ∪ names already on deals). */
   sdrs: string[];
-  dealSdrs: Record<string, string>;
+  /** Writes through to HubSpot's sourcing_sdr property. */
   onAssignSdr: (dealId: string, sdr: string | null) => void;
 }
 
-export function OpenDeals({ deals, sdrs, dealSdrs, onAssignSdr }: OpenDealsProps) {
+export function OpenDeals({ deals, sdrs, onAssignSdr }: OpenDealsProps) {
   const { now } = useDash();
 
   const open = useMemo(() => deals.filter((d) => d.isOpen), [deals]);
@@ -755,15 +755,15 @@ export function OpenDeals({ deals, sdrs, dealSdrs, onAssignSdr }: OpenDealsProps
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-ink-soft">{daysAgo(d.createdAt, now)}</td>
                   <td className="whitespace-nowrap px-3 py-2" onClick={(e) => e.stopPropagation()}>
                     <span className="inline-flex items-center gap-1.5">
-                      {dealSdrs[d.id] && <Avatar name={dealSdrs[d.id]} />}
+                      {d.sdr && <Avatar name={d.sdr} />}
                       <select
-                        value={dealSdrs[d.id] ?? ""}
+                        value={d.sdr ?? ""}
                         onChange={(e) => onAssignSdr(d.id, e.target.value || null)}
                         onKeyDown={(e) => e.stopPropagation()}
                         aria-label={`Sourcing SDR for ${d.name}`}
                         title="Who sourced this deal — assigned here, not in HubSpot"
                         className={
-                          dealSdrs[d.id]
+                          d.sdr
                             ? "border border-transparent bg-transparent px-1 py-1 text-xs text-ink-soft hover:border-rule focus:border-accent focus:outline-none"
                             : "border border-dashed border-rule-dark bg-transparent px-1.5 py-1 text-xs text-ink-faint hover:border-accent hover:text-accent focus:border-accent focus:outline-none"
                         }
@@ -796,15 +796,21 @@ export function OpenDeals({ deals, sdrs, dealSdrs, onAssignSdr }: OpenDealsProps
       </div>
       </div>
 
-      {selected && (
-        <OpenDealDrawer
-          deal={selected}
-          sdrs={sdrs}
-          sdr={dealSdrs[selected.id] ?? null}
-          onAssignSdr={(s) => onAssignSdr(selected.id, s)}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      {selected &&
+        (() => {
+          // re-resolve from the live array so an assignment made in the drawer
+          // (or any sync) reflects immediately
+          const live = deals.find((d) => d.id === selected.id) ?? selected;
+          return (
+            <OpenDealDrawer
+              deal={live}
+              sdrs={sdrs}
+              sdr={live.sdr ?? null}
+              onAssignSdr={(s) => onAssignSdr(live.id, s)}
+              onClose={() => setSelected(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

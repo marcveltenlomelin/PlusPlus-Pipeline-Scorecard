@@ -108,11 +108,14 @@ export function demoDeals(): { deals: Deal[]; pilotStageId: string } {
     const amount = hasAmount ? Math.round((20 + rand() * 100) / 5) * 5000 : null;
     const dealId = String(id++);
     const owner = OWNERS[Math.floor(rand() * OWNERS.length)];
+    // ~60% of demo deals carry sourcing attribution, like a real half-adopted rollout
+    const sdr = rand() < 0.6 ? OWNERS[Math.floor(rand() * OWNERS.length)].name : undefined;
     deals.push({
       id: dealId,
       name: `${COMPANIES[Math.floor(rand() * COMPANIES.length)]} — Platform`,
       ownerId: owner.id,
       ownerName: owner.name,
+      sdr,
       amount,
       value: amount ?? DEFAULT_DEAL_VALUE,
       stageId: stage.id,

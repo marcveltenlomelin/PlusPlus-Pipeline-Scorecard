@@ -48,11 +48,15 @@ leave it out of `.env.local` unless you *want* local dev writing to the producti
 3. `/api/deals` returns the normalized `DealsPayload`; `?refresh=1` forces a live fetch.
 4. `src/lib/metrics.ts` = pure functions over `Deal[]` (entries per period, trailing-90-day
    conversion cohorts, close rate, straight-line pace projections).
-5. Manual layer: `/api/store` GET/PATCH persists goals + per-cell overrides + SDR
-   attribution via `src/lib/store.ts`. With `BLOB_READ_WRITE_TOKEN` set it writes Vercel
+5. Manual layer: `/api/store` GET/PATCH persists goals + per-cell overrides + the SDR
+   **roster** via `src/lib/store.ts`. With `BLOB_READ_WRITE_TOKEN` set it writes Vercel
    Blob (each write = a new immutable `store/<ms>-<rand>.json` version, reads
    list-and-take-newest, prune keeps the latest 5); without it, `data/store.json`.
    Override IDs follow `domain:stage:period` (e.g. `tp:sal:2026-06`).
+6. SDR **assignments** live on the deal itself: custom HubSpot property `sourcing_sdr`
+   (created 2026-06-10), fetched with the deals and written back via POST
+   `/api/deals/sdr` → `setDealSdr()` — the app's only deal write
+   (crm.objects.deals.write). A successful write invalidates the in-memory deals memo.
 
 ## Conventions observed
 

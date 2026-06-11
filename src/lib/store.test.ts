@@ -10,30 +10,19 @@ function emptyStore(): Store {
     ) as Store["goals"],
     overrides: {},
     sdrs: [],
-    dealSdrs: {},
   };
 }
 
-describe("applyPatch — SDR semantics", () => {
+describe("applyPatch — SDR roster semantics", () => {
   it("adds trimmed, deduped SDR names", () => {
     const s = applyPatch(emptyStore(), { addSdrs: ["Ana", "  Ana  ", "Ben", ""] });
     expect(s.sdrs).toEqual(["Ana", "Ben"]);
   });
 
-  it("assigns deals only to known SDRs and clears with null", () => {
-    let s = applyPatch(emptyStore(), { addSdrs: ["Ana"] });
-    s = applyPatch(s, { setDealSdrs: { d1: "Ana", d2: "Ghost" } });
-    expect(s.dealSdrs).toEqual({ d1: "Ana" }); // unknown name ignored
-    s = applyPatch(s, { setDealSdrs: { d1: null } });
-    expect(s.dealSdrs).toEqual({});
-  });
-
-  it("removing an SDR unassigns their deals", () => {
+  it("removes names from the roster only (assignments live in HubSpot)", () => {
     let s = applyPatch(emptyStore(), { addSdrs: ["Ana", "Ben"] });
-    s = applyPatch(s, { setDealSdrs: { d1: "Ana", d2: "Ben" } });
     s = applyPatch(s, { removeSdrs: ["Ana"] });
     expect(s.sdrs).toEqual(["Ben"]);
-    expect(s.dealSdrs).toEqual({ d2: "Ben" });
   });
 
   it("leaves the legacy goals/overrides contract intact", () => {

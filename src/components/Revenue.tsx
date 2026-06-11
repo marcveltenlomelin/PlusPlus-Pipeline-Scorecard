@@ -29,9 +29,10 @@ import {
   type SortKey,
 } from "@/lib/openDeals";
 import { periodPhrase } from "@/lib/periods";
+import { dealStaleness } from "@/lib/stale";
 import type { Deal, Granularity } from "@/lib/types";
 import { useDash, useResolved } from "./ctx";
-import { EMPTY_TRACK, InfoTip, Metric, usePop } from "./Metric";
+import { EMPTY_TRACK, InfoTip, Metric, StaleBadge, usePop } from "./Metric";
 import OpenDealDrawer from "./OpenDealDrawer";
 
 interface RevenueProps {
@@ -673,11 +674,12 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
 
       <div ref={tableWrapRef} className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-sm">
+        <table className="w-full min-w-[42rem] text-sm">
           <thead>
             <tr className="border-b border-rule text-left">
               <SortTh label="Deal" k="name" className="px-5" />
               <SortTh label="Stage now" k="stage" className="px-3" />
+              <SortTh label="Status" k="status" className="px-3" />
               <th className="px-3 py-2 text-right">
                 <button
                   type="button"
@@ -697,7 +699,7 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center">
+                <td colSpan={7} className="px-5 py-12 text-center">
                   <p className="text-sm text-ink-soft">No deals match these filters</p>
                   <button
                     type="button"
@@ -726,6 +728,9 @@ export function OpenDeals({ deals }: { deals: Deal[] }) {
                 >
                   <td className="max-w-[18rem] truncate px-5 py-2 font-medium">{d.name}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-ink-soft">{d.stageLabel}</td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <StaleBadge staleness={dealStaleness(d, now)} />
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs">
                     {fmtMoney(d.value, { compact: true })}
                     {d.amount === null && (

@@ -2,6 +2,7 @@ import { CONVERSION_TARGETS, STAGE_LABELS, dealUrl } from "./config";
 import { fmtMoney, fmtPct } from "./format";
 import { conversion, enteredInPeriod, valueEnteredBetween } from "./metrics";
 import { dayOfPeriod, elapsedFraction, periodKey } from "./periods";
+import { staleDeals } from "./stale";
 import type { Deal, GoalStage, StageGoal } from "./types";
 
 /**
@@ -17,7 +18,6 @@ import type { Deal, GoalStage, StageGoal } from "./types";
  */
 
 const MS_DAY = 86_400_000;
-const STALE_DAYS = 90;
 const REVIVAL_WINDOW_DAYS = 90;
 const REVIVAL_MIN_VALUE = 25_000;
 const MILESTONE_STEP = 100_000;
@@ -49,32 +49,21 @@ export interface FocusAction {
 
 const money = (n: number) => fmtMoney(n, { compact: true });
 
-/** Days since the deal's last *tracked* stage entry — the best staleness proxy
- *  available (no stage-history or last-activity on the Deal shape). */
-function daysSinceLastMove(d: Deal, now: number): number {
-  const last = Math.max(...Object.values(d.entered));
-  return Math.max(0, Math.floor((now - last) / MS_DAY));
-}
-
 function staleCandidate(input: FocusInput): FocusAction | null {
-  let best: { deal: Deal; days: number; raw: number } | null = null;
-  for (const deal of input.deals) {
-    if (!deal.isOpen) continue;
-    const days = daysSinceLastMove(deal, input.now);
-    if (days <= STALE_DAYS) continue;
-    const raw = deal.value * days;
-    if (!best || raw > best.raw) best = { deal, days, raw };
-  }
-  if (!best) return null;
+  // shared definition: per-stage thresholds + the On Hold gate (lib/stale.ts);
+  // staleDeals() comes back sorted by value × days, so the worst offender is first
+  const [worst] = staleDeals(input.deals, input.now);
+  if (!worst) return null;
+  const { deal, staleness } = worst;
   // a $50K deal stale for a year saturates the scale
-  const score = Math.min(100, (best.raw / (50_000 * 365)) * 100);
+  const score = Math.min(100, ((deal.value * staleness.daysInStage) / (50_000 * 365)) * 100);
   return {
-    id: `stale:${best.deal.id}`,
+    id: `stale:${deal.id}`,
     category: "STALE DEAL",
     score,
-    diagnosis: `${best.deal.name} has sat in ${best.deal.stageLabel} for ${best.days} days at ${money(best.deal.value)}.`,
+    diagnosis: `${deal.name} has sat in ${deal.stageLabel} for ${staleness.daysInStage} days at ${money(deal.value)}.`,
     action: "Close-lost it or schedule a revival call — stop carrying it as pipeline.",
-    cta: { label: "Open in HubSpot ↗", href: best.deal.hubspotUrl },
+    cta: { label: "Open in HubSpot ↗", href: deal.hubspotUrl },
   };
 }
 

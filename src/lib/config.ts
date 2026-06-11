@@ -87,6 +87,32 @@ export const CLOSE_RATE_TARGET = 0.5;
 export const COVERAGE_TARGET = 3.0; // healthy SaaS benchmark
 export const COVERAGE_WARN = 2.0; // below this = need more top-of-funnel
 
+/* ── Stale-deal thresholds ────────────────────────────────────────────── */
+
+/** Days in stage before a deal counts as stale, per funnel stage. */
+export const STALE_THRESHOLDS = {
+  sal: 30,
+  sql: 45,
+  deepdive: 60,
+  pilot: 90,
+} as const;
+
+/** Stages that don't match a matcher below get this threshold (never "fresh by default"). */
+export const STALE_DEFAULT_THRESHOLD = 90;
+
+/** On Hold deals (parked deliberately) only demand attention past this age. */
+export const ON_HOLD_ATTENTION_DAYS = 180;
+
+/** Current-stage labels are free-form portal strings — match them to threshold keys. */
+export const STALE_STAGE_MATCHERS: [keyof typeof STALE_THRESHOLDS, RegExp][] = [
+  ["sal", /\bsal\b/i],
+  ["sql", /\bsql\b/i],
+  ["deepdive", /deep\s*dive/i],
+  ["pilot", /pilot|review/i],
+];
+
+export const ON_HOLD_MATCH = /on\s*hold/i;
+
 /** Trailing window for conversion and close-rate computations. */
 export const TRAILING_WINDOW_DAYS = 90;
 

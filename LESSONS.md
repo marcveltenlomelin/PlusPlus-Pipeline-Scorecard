@@ -265,3 +265,30 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: `pipelineCoverage` deliberately ignores the week/month period —
   remaining-quota math only changes shape at quarter/year boundaries; a "remaining month"
   coverage ratio would be noise.
+
+### 2026-06-10 · Stale deal flags + needs-attention section (main)
+
+- **Touched**: new `src/lib/stale.ts` (shared staleness: `dealStaleness`/`staleDeals`/
+  `severityRank` — the days-in-stage fallback chain is documented in its header comment),
+  `config.ts` (`STALE_THRESHOLDS` 30/45/60/90 + 90d default + 180d On-Hold gate +
+  label→key regex matchers), new `stale.test.ts` (5 tests), `todayFocus.ts`
+  (`staleCandidate` now consumes `staleDeals()` — one definition across hero/section/
+  table; existing tests passed unmodified), `openDeals.ts` (+`status` SortKey, severity
+  then days), `Metric.tsx` (shared `StaleBadge` dot+label chip), `Revenue.tsx` (STATUS
+  column, `colSpan` 6→7, table `min-w` 36→42rem), new `StaleDeals.tsx` + Dashboard
+  section above Open Deals.
+- **Surprises**: (1) The portal keeps moving *today*: Closed Lost hit 24 this month and
+  Today's Focus flipped its top card to REVIVAL — "Robinhood … closed lost **0 days
+  ago**" — i.e., the panel is now prescribing follow-up on the action it prescribed this
+  morning. Live verification doubles as a product demo. (2) The one stale deal
+  (Inriver/Pola, SQL 50d) scored 13.7 and correctly did NOT crack the Focus top 3 —
+  "wired into scoring" ≠ "always visible"; check the ranked list, not just the panel.
+  (3) TS2783 (key specified twice) fires when a factory sets a field explicitly *and*
+  spreads an `over` object that's required to contain it — let the spread own required
+  fields. (4) A `flex-1 min-w-0 truncate` name next to several `whitespace-nowrap`
+  siblings collapses to ~10px at 390px — `w-full sm:w-auto sm:flex-1` gives it its own
+  mobile line.
+- **Tip for future-you**: staleness thresholds and the stage-label regexes live entirely
+  in config — when the portal renames stages, fix the matcher there, not the lib. The
+  STATUS sort ranks stale(3) > on-hold(2) > aging(1) > fresh(0), days-in-stage as
+  tiebreak.

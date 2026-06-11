@@ -5,6 +5,7 @@ import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
 import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
 import { headlineWindows } from "@/lib/headline";
+import { staleDeals } from "@/lib/stale";
 import { DashCtx, type DrillSpec } from "./ctx";
 import Drilldown from "./Drilldown";
 import Funnel from "./Funnel";
@@ -15,6 +16,7 @@ import Pace from "./Pace";
 import Revenue, { OpenDeals, RevenueMath } from "./Revenue";
 import Scoreboard from "./Scoreboard";
 import SkeletonOverlay, { type SkeletonKind } from "./Skeleton";
+import StaleDeals from "./StaleDeals";
 import TodayFocus from "./TodayFocus";
 
 /** Uniform chapter treatment: hairline rule, 64px of air, uppercase header, plain-English subtitle. */
@@ -374,6 +376,17 @@ export default function Dashboard() {
               onRetry={() => void load(true)}
             >
               <Revenue deals={payload.deals} period={period} granularity={granularity} />
+            </Section>
+            <Section
+              title={`Stale Deals · Needs Attention (${staleDeals(payload.deals, now).length})`}
+              subtitle="Deals past their stage threshold, plus anything parked On Hold for 180+ days — worst first."
+              delay={290}
+              loading={syncing}
+              skeleton="table"
+              error={syncError}
+              onRetry={() => void load(true)}
+            >
+              <StaleDeals deals={payload.deals} />
             </Section>
             <Section
               title="Open Deals"

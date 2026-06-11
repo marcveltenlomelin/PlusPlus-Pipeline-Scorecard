@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtNum } from "@/lib/format";
 import type { PacingState } from "@/lib/metrics";
+import type { DealStaleness, StaleStatus } from "@/lib/stale";
 import { useDash, useResolved } from "./ctx";
 
 /** Shared dismiss-on-outside-click / Escape behavior for small popovers. */
@@ -32,6 +33,31 @@ export const POP_PANEL =
 
 /** Empty progress track: a deliberate "nothing yet" state, not a broken bar. */
 export const EMPTY_TRACK = "border border-dashed border-rule-dark bg-transparent";
+
+const STALE_STYLE: Record<StaleStatus, { dot: string; text: string; label: string }> = {
+  fresh: { dot: "bg-good", text: "text-good", label: "fresh" },
+  aging: { dot: "bg-warn", text: "text-warn", label: "aging" },
+  stale: { dot: "bg-bad", text: "text-bad", label: "stale" },
+  "on-hold": { dot: "bg-ink-faint", text: "text-ink-faint", label: "on hold" },
+};
+
+/** Status dot + label for a deal's staleness (Open Deals table, drill views). */
+export function StaleBadge({ staleness }: { staleness: DealStaleness }) {
+  const s = STALE_STYLE[staleness.status];
+  const title =
+    staleness.threshold !== null
+      ? `${staleness.daysInStage} days in stage · stale past ${staleness.threshold}d`
+      : `${staleness.daysInStage} days in stage · On Hold (needs attention past 180d)`;
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider ${s.text}`}
+    >
+      <span aria-hidden className={`size-2 rounded-full ${s.dot}`} />
+      {s.label}
+    </span>
+  );
+}
 
 /** Small info popover — every number's definition, one keypress away. */
 export function InfoTip({ text, label }: { text: string; label?: string }) {

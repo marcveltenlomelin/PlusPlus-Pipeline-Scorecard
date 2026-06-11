@@ -1,3 +1,4 @@
+import { dealStaleness, severityRank } from "./stale";
 import type { Deal } from "./types";
 
 /**
@@ -6,13 +7,14 @@ import type { Deal } from "./types";
  * pure function of (deals, filters, now).
  */
 
-export type SortKey = "name" | "stage" | "value" | "created" | "age";
+export type SortKey = "name" | "stage" | "status" | "value" | "created" | "age";
 export type SortDir = "asc" | "desc";
 
 /** Default direction applied the first time a column is sorted. */
 export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
   name: "asc",
   stage: "asc",
+  status: "desc", // worst (stale) first
   value: "desc",
   created: "desc",
   age: "desc", // stalest deals first
@@ -94,6 +96,14 @@ export function sortOpenDeals(deals: Deal[], key: SortKey, dir: SortDir, now: nu
         return a.name.localeCompare(b.name);
       case "stage":
         return a.stageLabel.localeCompare(b.stageLabel);
+      case "status": {
+        // severity first, then how deep into it the deal is
+        const sa = dealStaleness(a, now);
+        const sb = dealStaleness(b, now);
+        return (
+          severityRank(sa.status) - severityRank(sb.status) || sa.daysInStage - sb.daysInStage
+        );
+      }
       case "value":
         return a.value - b.value;
       case "created":

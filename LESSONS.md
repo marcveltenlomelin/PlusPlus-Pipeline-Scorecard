@@ -377,3 +377,30 @@ what to do next time. Read this file before starting any new task.
   on the file backend, production on Blob; with the token present, local dev writes the
   PRODUCTION store. Blob e2e verified: UI add → versioned blob via `vercel blob list` →
   GET reads newest; test data removed after.
+
+### 2026-06-10 · Blob-store decision, second perspective (main) — parallel sessions
+
+- **Context**: two Claude sessions worked this task in the SAME working tree at the same
+  time (one from the silent-SDR-save bug, one from the documented persistence
+  limitation). It converged instead of colliding because both sides read the other's
+  half before overwriting: the Edit tool's modified-since-read guard flagged every
+  collision (`store.ts`, `CLAUDE.md`), and `git status --short` + file mtimes revealed
+  the second stream. If files change under you mid-task, STOP and diff the whole tree
+  before assuming corruption — it may be a collaborator, and their design may carry
+  context you lack (here: the root cause; the reverse direction: the 60s CDN-staleness
+  hazard of a fixed pathname).
+- **Decision trail (for the record)**: Vercel KV no longer exists (folded into
+  Marketplace/Upstash, Dec 2024); Upstash Redis is the better pure primitive
+  (consistent GET/SET) but needs an interactive Marketplace provisioning flow + a second
+  vendor; Blob was already provisioned (`pipeline-store`, public access — immutable
+  choice, unguessable URLs) with the token on all envs. Immutable versioned pathnames
+  neutralize Blob's only real footgun for this workload.
+- **Cold-read testing without a second dev server**: a second `npm run dev` shares
+  `.next` and clobbers the running one (LESSONS pattern). Instead: a temporary
+  vitest spec gated on `describe.skipIf(!process.env.BLOB_E2E)`, run twice —
+  `BLOB_E2E=write` then `BLOB_E2E=read` in a FRESH process — proves the cold
+  list-and-take-newest path (module memo empty), not just the warm memo. Delete before
+  commit. Also: `(cmd &)` hides EADDRINUSE — my "dev server" on 3100 was actually the
+  other session's; check the log before trusting a port.
+- **Tip for future-you**: `zsh` eats `echo ===FOO===` as a glob/parse error inside
+  compound commands — use plain words as delimiters in verification one-liners.

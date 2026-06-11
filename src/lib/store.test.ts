@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_GOALS } from "./config";
 import { applyPatch, latestVersion, versionPathname } from "./store";
-import type { Store } from "./types";
+import { defaultDigest, type Store } from "./types";
 
 function emptyStore(): Store {
   return {
@@ -10,6 +10,7 @@ function emptyStore(): Store {
     ) as Store["goals"],
     overrides: {},
     sdrs: [],
+    digest: defaultDigest(),
   };
 }
 
@@ -35,6 +36,25 @@ describe("applyPatch — SDR roster semantics", () => {
     expect(s.overrides["tp:sal:2026-06"].value).toBe(9);
     const cleared = applyPatch(s, { clearOverrides: ["tp:sal:2026-06"] });
     expect(cleared.overrides).toEqual({});
+  });
+});
+
+describe("applyPatch — digest settings", () => {
+  it("merges digest config shallowly with per-key section merge", () => {
+    const s = applyPatch(emptyStore(), {
+      digest: { cadence: "biweekly", sections: { stale: false } },
+    });
+    expect(s.digest.cadence).toBe("biweekly");
+    expect(s.digest.sections.stale).toBe(false);
+    expect(s.digest.sections.headline).toBe(true); // untouched keys survive
+    expect(s.digest.recipients).toEqual([]);
+  });
+
+  it("normalizes recipients: trim, lowercase, dedupe, must contain @", () => {
+    const s = applyPatch(emptyStore(), {
+      digest: { recipients: [" Marc@PlusPlus.co ", "marc@plusplus.co", "not-an-email", "x@y.co"] },
+    });
+    expect(s.digest.recipients).toEqual(["marc@plusplus.co", "x@y.co"]);
   });
 });
 

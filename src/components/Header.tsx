@@ -340,6 +340,13 @@ export default function Header(p: HeaderProps) {
             {p.refreshing ? "Syncing…" : "Refresh"}
           </button>
           <HowToRead />
+          <a
+            href="/settings/digest"
+            title="Email digest settings"
+            className="text-[11px] text-ink-faint underline underline-offset-2 transition-colors hover:text-accent"
+          >
+            Digest
+          </a>
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/signin" })}

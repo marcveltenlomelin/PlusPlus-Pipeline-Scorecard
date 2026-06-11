@@ -16,6 +16,12 @@ export default auth((req) => {
   if (pathname.startsWith("/api/auth") || pathname === "/signin") {
     return NextResponse.next();
   }
+  // Self-protected public endpoints: the cron route verifies the CRON_SECRET
+  // bearer internally, and unsubscribe links carry a per-address HMAC token.
+  // Everything else stays behind Google sign-in.
+  if (pathname === "/api/digest/cron" || pathname === "/api/digest/unsubscribe") {
+    return NextResponse.next();
+  }
   if (req.auth?.user) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {

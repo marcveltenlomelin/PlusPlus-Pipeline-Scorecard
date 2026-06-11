@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { STAGE_GOALS } from "./config";
-import type { GoalStage, Store, StorePatch } from "./types";
+import { defaultDigest, type GoalStage, type Store, type StorePatch } from "./types";
 
 /**
  * Persistence for the manual layer (overrides + goals + SDR sourcing
@@ -103,10 +103,16 @@ function mergeGoals(saved?: Partial<Store["goals"]>): Store["goals"] {
 }
 
 function hydrate(raw: Partial<Store> | null): Store {
+  const digest = defaultDigest();
   return {
     goals: mergeGoals(raw?.goals),
     overrides: raw?.overrides ?? {},
     sdrs: raw?.sdrs ?? [],
+    digest: {
+      ...digest,
+      ...(raw?.digest ?? {}),
+      sections: { ...digest.sections, ...(raw?.digest?.sections ?? {}) },
+    },
   };
 }
 
@@ -134,6 +140,7 @@ export function applyPatch(store: Store, patch: StorePatch): Store {
     goals: { ...store.goals },
     overrides: { ...store.overrides },
     sdrs: [...store.sdrs],
+    digest: { ...store.digest, sections: { ...store.digest.sections } },
   };
   for (const [stage, g] of Object.entries(patch.goals ?? {}) as [
     GoalStage,
@@ -152,6 +159,18 @@ export function applyPatch(store: Store, patch: StorePatch): Store {
     // roster-only: assignments live on the deals (HubSpot sourcing_sdr) and
     // keep displaying/rolling up even for removed names
     next.sdrs = next.sdrs.filter((s) => s !== name);
+  }
+
+  if (patch.digest) {
+    next.digest = {
+      ...next.digest,
+      ...patch.digest,
+      // recipients normalize: trimmed, lowercased, deduped
+      recipients: (patch.digest.recipients ?? next.digest.recipients)
+        .map((r) => r.trim().toLowerCase())
+        .filter((r, i, a) => r.includes("@") && a.indexOf(r) === i),
+      sections: { ...next.digest.sections, ...(patch.digest.sections ?? {}) },
+    };
   }
   return next;
 }

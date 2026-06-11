@@ -531,3 +531,26 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: `stageSparkline` clips only when the first entry falls
   INSIDE the window (older history = full 13 months, however sparse). Empty months
   render a 1.5px baseline stub so the rhythm of the window stays visible.
+
+### 2026-06-11 · Weekly email digest (main)
+
+- **Touched**: new `src/lib/digest.ts` (buildDigest — full/aggregate variants, subject
+  headline, cadence `shouldSendNow`), `src/lib/sendDigest.ts` (Resend + HMAC unsubscribe
+  links + delivery polling), `src/emails/Digest.tsx` (React Email, light palette —
+  Gmail dark-mode inverts dark themes), routes `api/digest/{preview,send,cron,
+  unsubscribe}`, `/settings/digest` page, Header link, `vercel.json` cron (Mon 15:00
+  UTC ≈ 8am PT), middleware carve-outs for cron (CRON_SECRET bearer) and unsubscribe
+  (per-address HMAC). Store gains `digest` config (additive patch key; `defaultDigest`
+  lives in types.ts because store.ts imports fs and can't reach client bundles).
+- **Decisions**: full variant for @plusplus.co recipients, aggregate (names redacted)
+  for everyone else — same boundary as the sign-in gate. One weekly cron serves all
+  three cadences via lastSentAt gating with jitter-tolerant thresholds (≥6/13/27 days).
+- **Surprises**: (1) `Partial<DigestConfig>` doesn't make nested `sections` partial —
+  patch types need an explicit `Partial<Omit<…>> & { sections?: Partial<…> }`.
+  (2) The unsubscribe e2e works locally with an empty AUTH_SECRET (HMAC of "" is
+  consistent within one process) but prod tokens come from the real secret — don't
+  compare tokens across environments. (3) The preview route doubles as the screenshot
+  surface AND a permanent owner-facing feature (linked from settings).
+- **Tip for future-you**: `RESEND_API_KEY` is the only env var standing between the
+  cron and real sends; the cron route fails with a clear message until it exists.
+  `DIGEST_FROM` overrides the onboarding@resend.dev sender once the domain is verified.

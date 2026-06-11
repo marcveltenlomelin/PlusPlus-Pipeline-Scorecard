@@ -56,6 +56,28 @@ export interface Override {
   at: number;
 }
 
+export type DigestCadence = "weekly" | "biweekly" | "monthly";
+
+/** Email-digest section toggles, in render order. */
+export type DigestSection = "headline" | "focus" | "funnel" | "leaks" | "revenue" | "stale";
+
+export interface DigestConfig {
+  recipients: string[];
+  cadence: DigestCadence;
+  sections: Record<DigestSection, boolean>;
+  /** Epoch ms of the last successful cron send — drives bi-weekly/monthly skips. */
+  lastSentAt?: number;
+}
+
+/** Digest defaults — weekly, every section on, nobody subscribed yet. */
+export function defaultDigest(): DigestConfig {
+  return {
+    recipients: [],
+    cadence: "weekly",
+    sections: { headline: true, focus: true, funnel: true, leaks: true, revenue: true, stale: true },
+  };
+}
+
 export interface Store {
   /**
    * Per-stage goals at month/quarter/year (explicit values from the goal
@@ -70,6 +92,8 @@ export interface Store {
    * dashboard) — the roster is just the pick-list. Names are the identity.
    */
   sdrs: string[];
+  /** Weekly email digest configuration. */
+  digest: DigestConfig;
 }
 
 /** PATCH body for /api/store — additive keys only; existing shape is load-bearing. */
@@ -80,4 +104,8 @@ export interface StorePatch {
   addSdrs?: string[];
   /** Roster-only removal — deals keep their HubSpot-side attribution. */
   removeSdrs?: string[];
+  /** Shallow-merged digest settings; `sections` merges per-key. */
+  digest?: Partial<Omit<DigestConfig, "sections">> & {
+    sections?: Partial<Record<DigestSection, boolean>>;
+  };
 }

@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
-import type { DealsPayload, GoalStage, Granularity, StageKey, Store } from "@/lib/types";
+import {
+  defaultDigest,
+  type DealsPayload,
+  type GoalStage,
+  type Granularity,
+  type StageKey,
+  type Store,
+} from "@/lib/types";
 import { headlineWindows } from "@/lib/headline";
 import { sdrOwnerOf, UNASSIGNED_ID } from "@/lib/owners";
 import { staleDeals } from "@/lib/stale";
@@ -89,7 +96,7 @@ function defaultGoals(): Store["goals"] {
 }
 
 function emptyStore(): Store {
-  return { goals: defaultGoals(), overrides: {}, sdrs: [] };
+  return { goals: defaultGoals(), overrides: {}, sdrs: [], digest: defaultDigest() };
 }
 
 export default function Dashboard() {

@@ -247,3 +247,21 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: section entrance delays are 0–360ms in 60ms steps; a relocated
   section should take a delay matching its new slot (Headline now 330, between Open
   Deals' 300 and Revenue Math's 360).
+
+### 2026-06-10 · Pipeline coverage tile (main)
+
+- **Touched**: `metrics.ts` (new `pipelineCoverage()` — quarter view divides against the
+  quarter's $300K slice with won-this-quarter, everything else against the $1.2M annual
+  with won-YTD; `ratio: null` = quota met), `config.ts` (`COVERAGE_TARGET`/`COVERAGE_WARN`
+  + `DEFINITIONS["rev:coverage"]` — only the goals/display zone, no guarded constants),
+  new `metrics.test.ts` (4 tests), `Revenue.tsx` (grid `xl:grid-cols-4`→`-5`, fifth Tile,
+  threshold-colored value via signal tokens, "$X open" foot drills to the open-pipeline
+  deals reusing the Projected-ARR foot pattern).
+- **Surprises**: (1) The brief's example numbers ($719K open, 0.6x) were captured before
+  today's portal cleanup — live is $384K open → 0.3x. When a spec quotes concrete numbers
+  from a live system, expect drift between writing and shipping. (2) The wedged dev-tab
+  state recurred twice during verification; an in-page `location.href = url + ?r=<rand>`
+  recovers it faster than the navigate tool (which can race its own evaluate context).
+- **Tip for future-you**: `pipelineCoverage` deliberately ignores the week/month period —
+  remaining-quota math only changes shape at quarter/year boundaries; a "remaining month"
+  coverage ratio would be noise.

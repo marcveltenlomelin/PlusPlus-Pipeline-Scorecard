@@ -83,6 +83,10 @@ export const AVG_DEAL_SIZE = 50_000; // drives the revenue math (24 wins × $50K
 export const PIPELINE_PACE_PER_MONTH = 200_000;
 export const CLOSE_RATE_TARGET = 0.5;
 
+/** Pipeline coverage (open pipeline ÷ remaining quota) thresholds. */
+export const COVERAGE_TARGET = 3.0; // healthy SaaS benchmark
+export const COVERAGE_WARN = 2.0; // below this = need more top-of-funnel
+
 /** Trailing window for conversion and close-rate computations. */
 export const TRAILING_WINDOW_DAYS = 90;
 
@@ -136,6 +140,8 @@ export const DEFINITIONS: Record<string, string> = {
     "Closed-won YTD + (value of currently open deals that have entered SQL) × trailing-90-day close rate. A what-if at today's close rate, not a forecast model.",
   "rev:openPipeline":
     "Value of currently open deals that have entered SQL — the live pipeline behind the projection. Deals still sitting in SAL are excluded until they convert.",
+  "rev:coverage":
+    "Open pipeline (deals that entered SQL, still open) ÷ remaining quota (the $1.2M annual target minus closed-won YTD; quarter view uses the quarter's $300K slice minus closed-won this quarter). Healthy SaaS pipelines run 3–4× coverage. Below 2× signals you need more top-of-funnel. Target ≥ 3.0×.",
   goal: "Goals come from the goal model: $1.2M ARR ÷ $50K average deal = 24 closed-won deals/year, worked backwards up the funnel (Pilot→Won 50%, Deep Dive→Pilot 80%, SQL→Deep Dive 80%, SAL→SQL 20%). Monthly, quarterly, and annual goals are set explicitly per stage and editable by hand; weekly views derive monthly × 12 ÷ 52.",
   atRisk:
     "Flagged when actuals fall below 75% of the goal — prorated to the share of the period elapsed for the period in progress (e.g. mid-month, the bar is 75% of half the goal).",

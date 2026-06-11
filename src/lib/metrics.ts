@@ -1,6 +1,14 @@
-import { AT_RISK_THRESHOLD, TRAILING_WINDOW_DAYS } from "./config";
-import { elapsedFraction, granularityOf, inPeriod, isCurrentPeriod } from "./periods";
-import type { Deal, StageKey } from "./types";
+import { ARR_TARGET, AT_RISK_THRESHOLD, NET_NEW_OPP_STAGE, TRAILING_WINDOW_DAYS } from "./config";
+import {
+  elapsedFraction,
+  granularityOf,
+  inPeriod,
+  isCurrentPeriod,
+  periodKey,
+  periodLabel,
+  periodStart,
+} from "./periods";
+import type { Deal, Granularity, StageKey } from "./types";
 
 /**
  * Pure functions over normalized deals. Everything here counts STAGE ENTRIES
@@ -135,6 +143,40 @@ export function pacingBadge(
 export function openPipeline(deals: Deal[], enteredStage: StageKey): StageCount {
   const hits = deals.filter((d) => d.isOpen && d.entered[enteredStage] !== undefined);
   return { count: hits.length, totalValue: hits.reduce((s, d) => s + d.value, 0), deals: hits };
+}
+
+export interface PipelineCoverage {
+  /** open ÷ remaining; null when the quota is already met (remaining ≤ 0). */
+  ratio: number | null;
+  open: number;
+  remaining: number;
+  /** "2026" (remaining-year math) or "Q2 2026" (quarter view). */
+  scopeLabel: string;
+}
+
+/**
+ * Open pipeline ÷ remaining quota — the standard SaaS coverage check.
+ * Quarter view measures against the quarter's slice of the annual target;
+ * every other view measures against the remaining year.
+ */
+export function pipelineCoverage(deals: Deal[], granularity: Granularity, now: number): PipelineCoverage {
+  const open = openPipeline(deals, NET_NEW_OPP_STAGE).totalValue;
+  let quota: number;
+  let wonStart: number;
+  let scopeLabel: string;
+  if (granularity === "quarter") {
+    const qKey = periodKey(now, "quarter");
+    quota = ARR_TARGET / 4;
+    wonStart = periodStart(qKey).getTime();
+    scopeLabel = periodLabel(qKey);
+  } else {
+    quota = ARR_TARGET;
+    wonStart = new Date(new Date(now).getFullYear(), 0, 1).getTime();
+    scopeLabel = String(new Date(now).getFullYear());
+  }
+  const won = valueEnteredBetween(deals, "won", wonStart, now).totalValue;
+  const remaining = Math.max(0, quota - won);
+  return { ratio: remaining > 0 ? open / remaining : null, open, remaining, scopeLabel };
 }
 
 /** Sum of value entering `stage` between two epoch-ms instants (start inclusive). */

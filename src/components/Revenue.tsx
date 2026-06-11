@@ -4,13 +4,21 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ARR_TARGET,
   AVG_DEAL_SIZE,
+  COVERAGE_TARGET,
+  COVERAGE_WARN,
   DEFINITIONS,
   NET_NEW_OPP_STAGE,
   PIPELINE_PACE_PER_MONTH,
   STAGE_GOALS,
 } from "@/lib/config";
 import { daysAgo, fmtDate, fmtMoney, fmtPct } from "@/lib/format";
-import { closeRate, enteredInPeriod, openPipeline, valueEnteredBetween } from "@/lib/metrics";
+import {
+  closeRate,
+  enteredInPeriod,
+  openPipeline,
+  pipelineCoverage,
+  valueEnteredBetween,
+} from "@/lib/metrics";
 import {
   AGE_BUCKETS,
   DEFAULT_SORT_DIR,
@@ -94,8 +102,16 @@ export default function Revenue(p: RevenueProps) {
 
   const money = (n: number) => fmtMoney(n, { compact: true });
 
+  const coverage = pipelineCoverage(p.deals, p.granularity, now);
+  const coverageColor =
+    coverage.ratio === null || coverage.ratio >= COVERAGE_TARGET
+      ? "text-good"
+      : coverage.ratio >= COVERAGE_WARN
+        ? "text-warn"
+        : "text-bad";
+
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Tile
           label={`Pipeline created · ${phrase}`}
           def={DEFINITIONS["rev:pipeline"]}
@@ -188,6 +204,35 @@ export default function Revenue(p: RevenueProps) {
           }
         >
           <Metric id={`rev:projArr:${year}`} live={projected} format={money} />
+        </Tile>
+
+        <Tile
+          label={`Pipeline Coverage · Remaining ${coverage.scopeLabel}`}
+          def={DEFINITIONS["rev:coverage"]}
+          foot={
+            <>
+              <button
+                type="button"
+                className="underline decoration-rule-dark underline-offset-2 hover:text-accent"
+                onClick={() =>
+                  openDrill({
+                    title: "Open pipeline (entered SQL, still open)",
+                    subtitle: DEFINITIONS["rev:openPipeline"],
+                    deals: open.deals,
+                    dateOf: (d) => d.entered.sql,
+                    dateLabel: "Entered SQL",
+                  })
+                }
+              >
+                {money(coverage.open)} open
+              </button>{" "}
+              ÷ {money(coverage.remaining)} remaining quota · target ≥ {COVERAGE_TARGET.toFixed(1)}x
+            </>
+          }
+        >
+          <span className={coverageColor}>
+            {coverage.ratio === null ? "Met" : `${coverage.ratio.toFixed(1)}x`}
+          </span>
         </Tile>
     </div>
   );

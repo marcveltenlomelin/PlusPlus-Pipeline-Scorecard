@@ -1,6 +1,4 @@
-import { headlineKpis, headlineWindows } from "./headline";
-import { enteredInPeriod } from "./metrics";
-import type { Deal } from "./types";
+import type { Deal, StageKey } from "./types";
 
 /**
  * Owner-level rollups. Deals carry hubspot_owner_id; names resolve via the
@@ -62,41 +60,53 @@ export interface OwnerRow {
   owner: OwnerInfo;
   /** Currently-open deals attributed to this owner — "how many they own" right now. */
   openDeals: number;
+  /** Sourced deals that have EVER reached each stage — cumulative attribution. */
   sals: number;
   sqls: number;
   deepdives: number;
   pilots: number;
   won: number;
-  /** Value entering SQL in the period — pipeline $ created. */
+  /** Total value of sourced deals that ever entered SQL — pipeline $ sourced. */
   pipeValue: number;
-  /** Trailing-12-months win rate; null when nothing closed. */
-  winRateT12M: number | null;
-  wonLostT12M: { won: number; lost: number };
+  /** All-time win rate over the sourced cohort; null when nothing closed. */
+  winRate: number | null;
+  wonLost: { won: number; lost: number };
 }
 
-/** Per-owner period volumes + T12M win rate, sorted by pipe $ created desc. */
-export function ownerRollup(
-  deals: Deal[],
-  period: string,
-  now: number,
-  ownerOf?: (deal: Deal) => OwnerInfo
-): OwnerRow[] {
+/**
+ * Per-owner CUMULATIVE funnel: a sourced deal that reached Pilot counts one
+ * SQL, one Deep Dive, and one Pilot, whenever those entries happened. The
+ * period toggle deliberately does not scope this — crediting an SDR only for
+ * stages entered "this month" zeroes their history and reads as broken
+ * (confirmed with live data: Motive/Hanna, sourced by Milos, entered
+ * SQL/Deep Dive in April and Pilot in May). Sorted by pipe $ sourced desc.
+ */
+export function ownerRollup(deals: Deal[], ownerOf?: (deal: Deal) => OwnerInfo): OwnerRow[] {
   const of = ownerOf ?? hubspotOwnerOf;
-  const t12m = headlineWindows(now, "month"); // always trailing 12 months, per spec
-  return activeOwners(deals, of).map((owner) => {
-    const mine = deals.filter((d) => of(d).id === owner.id);
-    const k = headlineKpis(mine, t12m.cur, t12m.prior);
-    return {
-      owner,
-      openDeals: mine.filter((d) => d.isOpen).length,
-      sals: enteredInPeriod(mine, "sal", period).count,
-      sqls: enteredInPeriod(mine, "sql", period).count,
-      deepdives: enteredInPeriod(mine, "deepdive", period).count,
-      pilots: enteredInPeriod(mine, "pilot", period).count,
-      won: enteredInPeriod(mine, "won", period).count,
-      pipeValue: enteredInPeriod(mine, "sql", period).totalValue,
-      winRateT12M: k.winRate.rate,
-      wonLostT12M: { won: k.winRate.won, lost: k.winRate.lost },
-    };
-  }).sort((a, b) => b.pipeValue - a.pipeValue);
+  const reached = (mine: Deal[], stage: StageKey) =>
+    mine.filter((d) => d.entered[stage] !== undefined);
+  return activeOwners(deals, of)
+    .map((owner) => {
+      const mine = deals.filter((d) => of(d).id === owner.id);
+      const won = reached(mine, "won").length;
+      const lost = reached(mine, "lost").length;
+      return {
+        owner,
+        openDeals: mine.filter((d) => d.isOpen).length,
+        sals: mine.length, // entered.sal is always set (createdate = SAL signal)
+        sqls: reached(mine, "sql").length,
+        deepdives: reached(mine, "deepdive").length,
+        pilots: reached(mine, "pilot").length,
+        won,
+        pipeValue: reached(mine, "sql").reduce((s, d) => s + d.value, 0),
+        winRate: won + lost ? won / (won + lost) : null,
+        wonLost: { won, lost },
+      };
+    })
+    .sort((a, b) => {
+      // real people lead; the historical Unassigned bucket sits last regardless of size
+      if (a.owner.id === UNASSIGNED_ID) return 1;
+      if (b.owner.id === UNASSIGNED_ID) return -1;
+      return b.pipeValue - a.pipeValue;
+    });
 }

@@ -436,3 +436,22 @@ what to do next time. Read this file before starting any new task.
   other session's; check the log before trusting a port.
 - **Tip for future-you**: `zsh` eats `echo ===FOO===` as a glob/parse error inside
   compound commands — use plain words as delimiters in verification one-liners.
+
+### 2026-06-11 · By SDR cumulative sourced funnel (main)
+
+- **Touched**: `owners.ts` (`ownerRollup` drops the `period` param — stage columns count
+  deals that EVER entered each stage; pipe $ = all-time SQL-entered value; win rate =
+  all-time over the sourced cohort; Unassigned pinned last regardless of pipe $),
+  `OwnerBreakdown.tsx` (labels: "Pipe $ sourced", "Win rate"), `Dashboard.tsx` (section
+  retitled "By SDR · Sourced Funnel", period prop removed), `owners.test.ts` rewritten
+  to the cumulative contract.
+- **Root cause** (diagnosed against live data, not guessed): Motive/Hanna entered
+  SQL/Deep Dive 2026-04-14 and Pilot 2026-05-14; the table counted entries in the
+  *selected period* (June) → zeros everywhere except the period-free "Open deals"
+  column. The user's narration ("she went to a deep dive, that counts as one deep
+  dive") is cumulative attribution semantics — when a user says a tally is wrong,
+  first check whether the math is period-scoped and their mental model isn't.
+- **Tip for future-you**: the By SDR section is deliberately invariant under the
+  period toggle (verified in Playwright by toggling MONTH→QUARTER and diffing the
+  table). Don't "fix" it back to period-scoped; the per-period stage view already
+  exists — it's the Stage Entries scoreboard with the SDR filter applied.

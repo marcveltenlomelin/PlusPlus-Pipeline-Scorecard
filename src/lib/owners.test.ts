@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { activeOwners, ownerDisplayName, ownerRollup, UNASSIGNED_ID } from "./owners";
-import { periodKey } from "./periods";
+import { activeOwners, ownerDisplayName, ownerRollup, sdrOwnerOf, UNASSIGNED_ID } from "./owners";
 import type { Deal } from "./types";
 
 const DAY = 86_400_000;
 const NOW = new Date(2026, 5, 10, 12).getTime();
-const MONTH = periodKey(NOW, "month");
 
 function deal(over: Partial<Deal> & { id: string }): Deal {
   const createdAt = over.createdAt ?? NOW - 5 * DAY;
@@ -40,19 +38,41 @@ describe("ownerDisplayName / activeOwners", () => {
   });
 });
 
-describe("ownerRollup", () => {
-  it("counts period volumes per owner and sorts by pipe $ desc", () => {
-    const sal = NOW - 3 * DAY;
+describe("ownerRollup (cumulative sourced funnel)", () => {
+  it("credits every stage a sourced deal has ever reached, across months", () => {
+    // the Motive/Hanna shape: SQL + Deep Dive in April, Pilot in May, viewed in June
+    const apr = NOW - 57 * DAY;
+    const may = NOW - 27 * DAY;
     const deals = [
-      // Alex: 1 SAL + 1 SQL this month at $80K
-      deal({ id: "a1", ...A, createdAt: sal, entered: { sal, sql: NOW - 2 * DAY }, value: 80_000 }),
-      // Sam: 2 SALs, 1 SQL at $30K
-      deal({ id: "b1", ...B, createdAt: sal, entered: { sal } }),
-      deal({ id: "b2", ...B, createdAt: sal, entered: { sal, sql: NOW - DAY }, value: 30_000 }),
+      deal({
+        id: "m1",
+        sdr: "Milos",
+        createdAt: apr,
+        entered: { sal: apr, sql: apr, deepdive: apr, pilot: may },
+        stageLabel: "Review / Pilot",
+      }),
     ];
-    const rows = ownerRollup(deals, MONTH, NOW);
+    const rows = ownerRollup(deals, sdrOwnerOf);
+    const milos = rows[0];
+    expect(milos.owner.name).toBe("Milos");
+    expect(milos.openDeals).toBe(1);
+    expect(milos.sals).toBe(1);
+    expect(milos.sqls).toBe(1);
+    expect(milos.deepdives).toBe(1);
+    expect(milos.pilots).toBe(1);
+    expect(milos.won).toBe(0);
+    expect(milos.pipeValue).toBe(50_000); // entered SQL ever → counts
+  });
+
+  it("sorts by all-time pipe $ sourced, desc", () => {
+    const old = NOW - 200 * DAY;
+    const deals = [
+      deal({ id: "a1", ...A, createdAt: old, entered: { sal: old, sql: old }, value: 80_000 }),
+      deal({ id: "b1", ...B, createdAt: old, entered: { sal: old } }),
+      deal({ id: "b2", ...B, createdAt: old, entered: { sal: old, sql: old }, value: 30_000 }),
+    ];
+    const rows = ownerRollup(deals);
     expect(rows[0].owner.name).toBe("Alex"); // 80K > 30K
-    expect(rows[0].sals).toBe(1);
     expect(rows[0].sqls).toBe(1);
     expect(rows[0].pipeValue).toBe(80_000);
     expect(rows[1].owner.name).toBe("Sam");
@@ -60,28 +80,26 @@ describe("ownerRollup", () => {
     expect(rows[1].pipeValue).toBe(30_000);
   });
 
-  it("computes T12M win rate per owner independent of the period", () => {
-    const wonAt = NOW - 100 * DAY;
+  it("computes all-time win rate over the sourced cohort", () => {
+    const wonAt = NOW - 400 * DAY; // outside any trailing window — still counts
     const deals = [
       deal({ id: "a1", ...A, isOpen: false, entered: { sal: wonAt - 60 * DAY, won: wonAt } }),
       deal({ id: "a2", ...A, isOpen: false, entered: { sal: wonAt - 60 * DAY, lost: wonAt } }),
       deal({ id: "b1", ...B }), // open, nothing closed
     ];
-    const rows = ownerRollup(deals, MONTH, NOW);
+    const rows = ownerRollup(deals);
     const alex = rows.find((r) => r.owner.name === "Alex")!;
-    expect(alex.winRateT12M).toBeCloseTo(0.5);
-    expect(alex.wonLostT12M).toEqual({ won: 1, lost: 1 });
+    expect(alex.winRate).toBeCloseTo(0.5);
+    expect(alex.wonLost).toEqual({ won: 1, lost: 1 });
     const sam = rows.find((r) => r.owner.name === "Sam")!;
-    expect(sam.winRateT12M).toBeNull();
+    expect(sam.winRate).toBeNull();
   });
 
   it("handles the single-owner book", () => {
-    const rows = ownerRollup([deal({ id: "a1", ...A })], MONTH, NOW);
-    expect(rows).toHaveLength(1);
+    expect(ownerRollup([deal({ id: "a1", ...A })])).toHaveLength(1);
   });
 
-  it("rolls up by SDR attribution read from the deals themselves", async () => {
-    const { sdrOwnerOf } = await import("./owners");
+  it("rolls up by SDR attribution read from the deals themselves", () => {
     const sal = NOW - 3 * DAY;
     const deals = [
       // sdr cuts across HubSpot owners: Ana sourced d1+d3, d2 unassigned
@@ -89,11 +107,11 @@ describe("ownerRollup", () => {
       deal({ id: "d2", ...A, createdAt: sal, entered: { sal } }),
       deal({ id: "d3", ...B, sdr: "Ana", createdAt: sal, entered: { sal } }),
     ];
-    const rows = ownerRollup(deals, MONTH, NOW, sdrOwnerOf);
+    const rows = ownerRollup(deals, sdrOwnerOf);
     expect(rows.map((r) => r.owner.name)).toEqual(["Ana", "Unassigned"]);
     expect(rows[0].sals).toBe(2);
     expect(rows[0].pipeValue).toBe(70_000);
-    expect(rows[0].openDeals).toBe(2); // owned-now count, independent of the period
+    expect(rows[0].openDeals).toBe(2);
     expect(rows[1].sals).toBe(1);
   });
 });

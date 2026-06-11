@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { fmtMoney, fmtNum, fmtPct } from "@/lib/format";
 import { ownerRollup, UNASSIGNED_ID, type OwnerInfo, type OwnerRow } from "@/lib/owners";
 import type { Deal } from "@/lib/types";
-import { useDash } from "./ctx";
 
 /**
  * Colored-initials avatar. The HubSpot owners API exposes no user photo URL,
@@ -43,7 +42,6 @@ export function Avatar({ name, photoUrl }: { name: string; photoUrl?: string }) 
 
 interface OwnerBreakdownProps {
   deals: Deal[];
-  period: string;
   /** Attribution selector — defaults to HubSpot owner; pass sdrOwnerOf(...) for sourcing. */
   ownerOf?: (deal: Deal) => OwnerInfo;
   /** Currently filtered owner (highlight + toggle target). */
@@ -64,17 +62,13 @@ const NUM_COLS: {
 ];
 
 function winRateCell(row: OwnerRow): string {
-  if (row.winRateT12M === null) return "—";
-  return `${fmtPct(row.winRateT12M)} (${row.wonLostT12M.won}–${row.wonLostT12M.lost})`;
+  if (row.winRate === null) return "—";
+  return `${fmtPct(row.winRate)} (${row.wonLost.won}–${row.wonLost.lost})`;
 }
 
-/** Per-rep period volumes + T12M win rate. Single-owner books get a leaderboard card. */
+/** Cumulative sourced-funnel per rep. Single-owner books get a leaderboard card. */
 export default function OwnerBreakdown(p: OwnerBreakdownProps) {
-  const { now } = useDash();
-  const rows = useMemo(
-    () => ownerRollup(p.deals, p.period, now, p.ownerOf),
-    [p.deals, p.period, now, p.ownerOf]
-  );
+  const rows = useMemo(() => ownerRollup(p.deals, p.ownerOf), [p.deals, p.ownerOf]);
 
   // Solo book: one card with tiles instead of a one-row table.
   if (rows.length === 1) {
@@ -93,11 +87,11 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
             </div>
           ))}
           <div>
-            <p className="microlabel">Pipe $ created</p>
+            <p className="microlabel">Pipe $ sourced</p>
             <p className="mt-1 font-mono text-2xl font-bold">{fmtMoney(r.pipeValue, { compact: true })}</p>
           </div>
           <div>
-            <p className="microlabel">Win rate (T12M)</p>
+            <p className="microlabel">Win rate</p>
             <p className="mt-1 font-mono text-2xl font-bold">{winRateCell(r)}</p>
           </div>
         </div>
@@ -116,8 +110,8 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
                 {c.label}
               </th>
             ))}
-            <th className="microlabel px-3 py-2.5 text-right font-semibold">Pipe $ created</th>
-            <th className="microlabel px-5 py-2.5 text-right font-semibold">Win rate (T12M)</th>
+            <th className="microlabel px-3 py-2.5 text-right font-semibold">Pipe $ sourced</th>
+            <th className="microlabel px-5 py-2.5 text-right font-semibold">Win rate</th>
           </tr>
         </thead>
         <tbody>

@@ -455,8 +455,8 @@ export default function Dashboard() {
               <Funnel deals={visibleDeals} pilotTracked={payload.pilotTracked} />
             </Section>
             <Section
-              title={`By SDR · ${phrase}`}
-              subtitle="Sourcing attribution — who brought each deal in (assigned here, not in HubSpot). Click a name to filter the whole page. Win rate stays trailing-12-months."
+              title="By SDR · Sourced Funnel"
+              subtitle="Everything each SDR has sourced and how far it got — cumulative, not period-scoped. Click a name to filter the whole page."
               delay={210}
               loading={syncing}
               skeleton="table"
@@ -466,7 +466,6 @@ export default function Dashboard() {
               {/* always the full book — this is the comparison view */}
               <OwnerBreakdown
                 deals={payload.deals}
-                period={period}
                 ownerOf={sdrOwnerOf}
                 selectedOwner={sdrFilter}
                 onSelectOwner={setSdrFilter}

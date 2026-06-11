@@ -574,3 +574,32 @@ what to do next time. Read this file before starting any new task.
   delivers to marc@plusplus.co — the other four recipients will come back with
   per-recipient errors in the cron results. Domain verification + `DIGEST_FROM`
   unlocks them; no code change needed.
+
+### 2026-06-11 · Funnel chart annotations (main)
+
+- **Touched**: `types.ts` (`ChartAnnotation`/`AnnotationOp`/`AnnotationColor`,
+  `Store.annotations`), `store.ts` (pure `applyAnnotationOp` — permission matrix +
+  validation in one tested reducer; `writeStore` exported), new
+  `src/app/api/annotations/route.ts` (single POST carrying the op union), `config.ts`
+  (`ADMIN_EMAILS`), `page.tsx` (async, session → `userEmail`/`isAdmin` props),
+  `Dashboard.tsx` (`onAnnotations` callback → storeError banner on failure),
+  `FunnelTrend.tsx` (▼ ReferenceDot markers, detail/edit popovers, hover
+  "+ Add note · {month}" button, Notes legend chip).
+- **Decisions**: (1) The spec said "existing backend (Supabase/Postgres — confirm via
+  exploration)" — explored: NEITHER EXISTS. The backend is the Blob store; annotations
+  live in the Store document. (2) Author identity is server-stamped from the session and
+  ownership is enforced in the reducer — annotation keys are deliberately NOT in
+  /api/store's applyPatch, or any client could forge authors. (3) Note creation is
+  month-view only (a quarter point doesn't name a month); markers render at every
+  granularity by mapping monthIso into the containing bucket.
+- **Surprises**: (1) `page.tsx` calling `auth()` made EVERY local page load log
+  MissingSecret server errors — AUTH_SECRET is absent locally since the CLI env
+  overwrite. Guard: `process.env.AUTH_SECRET ? await auth() : null` (production has the
+  secret; tokenless dev uses the dev-author fallback). (2) ReferenceDot custom shapes
+  receive `{cx, cy}` untyped — cast through `unknown`, and put `<title>` INSIDE the
+  path for native hover tooltips. (3) The local dev store is the SHARED production
+  blob — e2e-created notes are visible to the team; clean up test annotations after
+  verification.
+- **Tip for future-you**: `applyAnnotationOp(store, op, actor, stamp)` takes identity
+  and ids/timestamps as ARGUMENTS — the route is the only place that mints them, tests
+  pass fixed values, and nothing in the reducer needs mocking.

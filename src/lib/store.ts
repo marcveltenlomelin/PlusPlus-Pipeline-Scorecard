@@ -3,7 +3,15 @@ import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { STAGE_GOALS } from "./config";
-import { defaultDigest, type GoalStage, type Store, type StorePatch } from "./types";
+import {
+  defaultDigest,
+  type AnnotationColor,
+  type AnnotationOp,
+  type ChartAnnotation,
+  type GoalStage,
+  type Store,
+  type StorePatch,
+} from "./types";
 
 /**
  * Persistence for the manual layer (overrides + goals + SDR sourcing
@@ -113,6 +121,83 @@ function hydrate(raw: Partial<Store> | null): Store {
       ...(raw?.digest ?? {}),
       sections: { ...digest.sections, ...(raw?.digest?.sections ?? {}) },
     },
+    annotations: raw?.annotations ?? [],
+  };
+}
+
+/* ── Chart annotations ───────────────────────────────────────────────── */
+
+const ANNOTATION_COLORS: AnnotationColor[] = ["accent", "good", "warn", "bad", "ahead"];
+
+function validateAnnotationFields(title: string, description: string | undefined, color: AnnotationColor): void {
+  if (!title.trim()) throw new AnnotationError(400, "Title is required");
+  if (title.length > 60) throw new AnnotationError(400, "Title must be 60 characters or fewer");
+  if (description !== undefined && description.length > 280)
+    throw new AnnotationError(400, "Description must be 280 characters or fewer");
+  if (!ANNOTATION_COLORS.includes(color)) throw new AnnotationError(400, "Unknown color");
+}
+
+export class AnnotationError extends Error {
+  constructor(
+    public status: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * Pure annotation reducer — permission and validation logic in one testable
+ * place. Authors edit/delete their own; admins anyone's. The author email and
+ * timestamps come from the CALLER (the API route stamps them from the
+ * session) — this function never trusts op-supplied identity. Deliberately
+ * not reachable through /api/store's applyPatch.
+ */
+export function applyAnnotationOp(
+  store: Store,
+  op: AnnotationOp,
+  actor: { email: string; isAdmin: boolean },
+  stamp: { id: string; now: number }
+): Store {
+  if (op.kind === "create") {
+    validateAnnotationFields(op.title, op.description, op.color);
+    if (!/^\d{4}-\d{2}$/.test(op.monthIso)) throw new AnnotationError(400, "monthIso must be YYYY-MM");
+    const annotation: ChartAnnotation = {
+      id: stamp.id,
+      monthIso: op.monthIso,
+      title: op.title.trim(),
+      description: op.description?.trim() || undefined,
+      color: op.color,
+      authorEmail: actor.email,
+      createdAt: stamp.now,
+      updatedAt: stamp.now,
+    };
+    return { ...store, annotations: [...store.annotations, annotation] };
+  }
+
+  const existing = store.annotations.find((a) => a.id === op.id);
+  if (!existing) throw new AnnotationError(404, "Annotation not found");
+  if (existing.authorEmail !== actor.email && !actor.isAdmin)
+    throw new AnnotationError(403, "Only the author or an admin can change this note");
+
+  if (op.kind === "delete") {
+    return { ...store, annotations: store.annotations.filter((a) => a.id !== op.id) };
+  }
+
+  validateAnnotationFields(op.title, op.description, op.color);
+  return {
+    ...store,
+    annotations: store.annotations.map((a) =>
+      a.id === op.id
+        ? {
+            ...a,
+            title: op.title.trim(),
+            description: op.description?.trim() || undefined,
+            color: op.color,
+            updatedAt: stamp.now,
+          }
+        : a
+    ),
   };
 }
 
@@ -125,7 +210,7 @@ export async function readStore(): Promise<Store> {
   }
 }
 
-async function writeStore(store: Store): Promise<void> {
+export async function writeStore(store: Store): Promise<void> {
   if (useBlob()) {
     await writeBlob(store);
     return;
@@ -141,6 +226,7 @@ export function applyPatch(store: Store, patch: StorePatch): Store {
     overrides: { ...store.overrides },
     sdrs: [...store.sdrs],
     digest: { ...store.digest, sections: { ...store.digest.sections } },
+    annotations: [...store.annotations], // mutated only via applyAnnotationOp
   };
   for (const [stage, g] of Object.entries(patch.goals ?? {}) as [
     GoalStage,

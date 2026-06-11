@@ -5,6 +5,7 @@ import { STAGE_GOALS } from "@/lib/config";
 import { periodKey, periodPhrase } from "@/lib/periods";
 import {
   defaultDigest,
+  type AnnotationOp,
   type DealsPayload,
   type GoalStage,
   type Granularity,
@@ -96,10 +97,16 @@ function defaultGoals(): Store["goals"] {
 }
 
 function emptyStore(): Store {
-  return { goals: defaultGoals(), overrides: {}, sdrs: [], digest: defaultDigest() };
+  return { goals: defaultGoals(), overrides: {}, sdrs: [], digest: defaultDigest(), annotations: [] };
 }
 
-export default function Dashboard() {
+interface DashboardProps {
+  /** Session email (or the dev-bypass author); null when unauthenticated. */
+  userEmail: string | null;
+  isAdmin: boolean;
+}
+
+export default function Dashboard({ userEmail, isAdmin }: DashboardProps) {
   // The page is statically prerendered; date-derived UI must not hydrate
   // against a stale build-time clock.
   const [mounted, setMounted] = useState(false);
@@ -210,6 +217,26 @@ export default function Dashboard() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        setStore(await res.json());
+        setStoreError(null);
+      } else {
+        const detail = (await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`;
+        setStoreError(detail);
+      }
+    } catch (err) {
+      setStoreError(err instanceof Error ? err.message : "Network error");
+    }
+  }, []);
+
+  /** Annotation mutations go through their own route (server-stamped author). */
+  const onAnnotations = useCallback(async (op: AnnotationOp) => {
+    try {
+      const res = await fetch("/api/annotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(op),
       });
       if (res.ok) {
         setStore(await res.json());
@@ -431,6 +458,10 @@ export default function Dashboard() {
                 period={period}
                 pilotTracked={payload.pilotTracked}
                 goalFor={goalFor}
+                annotations={store.annotations}
+                userEmail={userEmail}
+                isAdmin={isAdmin}
+                onAnnotations={onAnnotations}
               />
             </Section>
             <Section

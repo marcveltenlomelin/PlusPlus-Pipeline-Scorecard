@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_GOALS } from "./config";
-import { applyPatch, latestVersion, versionPathname } from "./store";
-import { defaultDigest, type Store } from "./types";
+import { applyAnnotationOp, applyPatch, latestVersion, versionPathname } from "./store";
+import { defaultDigest, type AnnotationOp, type Store } from "./types";
 
 function emptyStore(): Store {
   return {
@@ -11,6 +11,7 @@ function emptyStore(): Store {
     overrides: {},
     sdrs: [],
     digest: defaultDigest(),
+    annotations: [],
   };
 }
 
@@ -72,5 +73,74 @@ describe("blob version pathnames", () => {
     expect(latestVersion([v2, "other/zzz.json", v1])).toBe(v2);
     expect(latestVersion(["other/zzz.json"])).toBeNull();
     expect(latestVersion([])).toBeNull();
+  });
+});
+
+describe("applyAnnotationOp", () => {
+  const base = (): Store => ({
+    ...emptyStore(),
+    annotations: [
+      {
+        id: "a1",
+        monthIso: "2026-04",
+        title: "Webinar ran",
+        color: "good",
+        authorEmail: "milos@plusplus.co",
+        createdAt: 1000,
+        updatedAt: 1000,
+      },
+    ],
+  });
+  const milos = { email: "milos@plusplus.co", isAdmin: false };
+  const daniela = { email: "daniela@plusplus.co", isAdmin: false };
+  const admin = { email: "marc@plusplus.co", isAdmin: true };
+  const stamp = { id: "a2", now: 2000 };
+
+  it("creates with server-stamped author and timestamps", () => {
+    const s = applyAnnotationOp(
+      base(),
+      { kind: "create", monthIso: "2026-06", title: "  Launch  ", color: "accent" },
+      daniela,
+      stamp
+    );
+    const a = s.annotations.find((x) => x.id === "a2")!;
+    expect(a.authorEmail).toBe("daniela@plusplus.co");
+    expect(a.title).toBe("Launch"); // trimmed
+    expect(a.createdAt).toBe(2000);
+  });
+
+  it("validates title, description, color, and month format", () => {
+    const create = (over: object) =>
+      applyAnnotationOp(base(), { kind: "create", monthIso: "2026-06", title: "t", color: "good", ...over } as AnnotationOp, milos, stamp);
+    expect(() => create({ title: "" })).toThrow(/required/);
+    expect(() => create({ title: "x".repeat(61) })).toThrow(/60/);
+    expect(() => create({ description: "x".repeat(281) })).toThrow(/280/);
+    expect(() => create({ color: "magenta" })).toThrow(/color/i);
+    expect(() => create({ monthIso: "June 2026" })).toThrow(/YYYY-MM/);
+  });
+
+  it("lets the author update their own, preserving createdAt", () => {
+    const s = applyAnnotationOp(
+      base(),
+      { kind: "update", id: "a1", title: "Webinar + LinkedIn push", color: "warn" },
+      milos,
+      stamp
+    );
+    const a = s.annotations[0];
+    expect(a.title).toBe("Webinar + LinkedIn push");
+    expect(a.createdAt).toBe(1000);
+    expect(a.updatedAt).toBe(2000);
+  });
+
+  it("blocks non-authors and allows admins", () => {
+    expect(() =>
+      applyAnnotationOp(base(), { kind: "delete", id: "a1" }, daniela, stamp)
+    ).toThrow(/author or an admin/);
+    const s = applyAnnotationOp(base(), { kind: "delete", id: "a1" }, admin, stamp);
+    expect(s.annotations).toHaveLength(0);
+  });
+
+  it("404s on unknown ids", () => {
+    expect(() => applyAnnotationOp(base(), { kind: "delete", id: "nope" }, admin, stamp)).toThrow(/not found/);
   });
 });

@@ -94,7 +94,34 @@ export interface Store {
   sdrs: string[];
   /** Weekly email digest configuration. */
   digest: DigestConfig;
+  /** Team-visible notes pinned to Funnel Trend months. */
+  annotations: ChartAnnotation[];
 }
+
+/** The five annotation color presets — existing signal tokens. */
+export type AnnotationColor = "accent" | "good" | "warn" | "bad" | "ahead";
+
+/** A note pinned to a month on the Funnel Trend chart, visible to the team. */
+export interface ChartAnnotation {
+  id: string;
+  /** Month key, e.g. "2026-06". */
+  monthIso: string;
+  /** Required, ≤60 chars. */
+  title: string;
+  /** Optional, ≤280 chars. */
+  description?: string;
+  color: AnnotationColor;
+  /** Stamped server-side from the session — never client-supplied. */
+  authorEmail: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Mutation ops for /api/annotations (author/admin enforced server-side). */
+export type AnnotationOp =
+  | { kind: "create"; monthIso: string; title: string; description?: string; color: AnnotationColor }
+  | { kind: "update"; id: string; title: string; description?: string; color: AnnotationColor }
+  | { kind: "delete"; id: string };
 
 /** PATCH body for /api/store — additive keys only; existing shape is load-bearing. */
 export interface StorePatch {

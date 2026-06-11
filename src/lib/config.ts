@@ -87,6 +87,9 @@ export const CLOSE_RATE_TARGET = 0.5;
 export const COVERAGE_TARGET = 3.0; // healthy SaaS benchmark
 export const COVERAGE_WARN = 2.0; // below this = need more top-of-funnel
 
+/** Can edit/delete anyone's chart annotations (authors can always edit their own). */
+export const ADMIN_EMAILS = ["marc@plusplus.co"];
+
 /* ── Stage win probabilities (weighted pipeline) ──────────────────────── */
 
 /** Forecast weight of an open deal by current stage — value × probability. */

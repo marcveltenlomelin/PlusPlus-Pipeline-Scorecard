@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_GOALS } from "./config";
-import { buildDigest, shouldSendNow, weekOfLabel } from "./digest";
+import { buildDigest, isDigestDay, shouldSendNow, weekOfLabel } from "./digest";
 import type { Deal } from "./types";
 
 const DAY = 86_400_000;
@@ -32,7 +32,7 @@ const staleDeal = deal({
 describe("buildDigest", () => {
   it("builds a subject with the week label and a stale-led headline", () => {
     const d = buildDigest([staleDeal, deal({ id: "a" })], STAGE_GOALS, NOW, "full", true);
-    expect(d.subject).toMatch(/^PlusPlus Pipeline · Week of Jun 8, 2026 · /);
+    expect(d.subject).toMatch(/^PlusPlus Pipeline · Week of Jun 1, 2026 · /);
     expect(d.subject).toContain("1 stale deal needs attention");
   });
 
@@ -51,32 +51,48 @@ describe("buildDigest", () => {
     expect(d.stale.count).toBe(1); // aggregates survive
   });
 
-  it("counts this week's funnel entries with weekly goals", () => {
-    const d = buildDigest([deal({ id: "thisweek" })], STAGE_GOALS, NOW, "full", true);
+  it("counts LAST week's funnel entries (not the in-progress week) with weekly goals", () => {
+    // NOW = Wed Jun 10 → last week is Jun 1–7; a deal 7 days ago lands there.
+    const lastWeek = deal({ id: "lastweek", createdAt: NOW - 7 * DAY, entered: { sal: NOW - 7 * DAY } });
+    const thisWeek = deal({ id: "thisweek", createdAt: NOW - 1 * DAY, entered: { sal: NOW - 1 * DAY } });
+    const d = buildDigest([lastWeek, thisWeek], STAGE_GOALS, NOW, "full", true);
     const sal = d.funnel.find((f) => f.stage === "SAL")!;
-    expect(sal.count).toBe(1);
+    expect(sal.count).toBe(1); // only the prior-week deal counts
     expect(sal.goal).toBeCloseTo((31 * 12) / 52, 0);
   });
 });
 
 describe("buildDigest — By SDR weekly block", () => {
-  it("credits this week's entries per SDR, shows roster zeros, buckets unassigned", () => {
+  it("credits LAST week's entries per SDR, shows roster zeros, buckets unassigned", () => {
     const milosDeal = deal({
       id: "m1",
       sdr: "Milos",
-      createdAt: NOW - 1 * DAY, // this week (Wed; week starts Mon)
+      createdAt: NOW - 7 * DAY, // last week (Jun 1–7) — the reported window
+      entered: { sal: NOW - 7 * DAY, sql: NOW - 7 * DAY },
+    });
+    const thisWeekMilos = deal({
+      id: "m3",
+      sdr: "Milos",
+      createdAt: NOW - 1 * DAY, // in-progress week — must NOT count
       entered: { sal: NOW - 1 * DAY, sql: NOW - 1 * DAY },
     });
     const oldMilosDeal = deal({
       id: "m2",
       sdr: "Milos",
-      createdAt: NOW - 30 * DAY, // last month — not this week's numbers
+      createdAt: NOW - 30 * DAY, // last month — not last week's numbers
       entered: { sal: NOW - 30 * DAY },
     });
-    const unattributed = deal({ id: "u1", createdAt: NOW - 1 * DAY, entered: { sal: NOW - 1 * DAY } });
-    const d = buildDigest([milosDeal, oldMilosDeal, unattributed], STAGE_GOALS, NOW, "full", true, ["Milos", "Daniela"]);
+    const unattributed = deal({ id: "u1", createdAt: NOW - 7 * DAY, entered: { sal: NOW - 7 * DAY } });
+    const d = buildDigest(
+      [milosDeal, thisWeekMilos, oldMilosDeal, unattributed],
+      STAGE_GOALS,
+      NOW,
+      "full",
+      true,
+      ["Milos", "Daniela"]
+    );
     const milos = d.sdrs.find((s) => s.name === "Milos")!;
-    expect(milos.sals).toBe(1);
+    expect(milos.sals).toBe(1); // last week only — this-week + last-month excluded
     expect(milos.sqls).toBe(1);
     expect(milos.pipe).toBe("$50K");
     const daniela = d.sdrs.find((s) => s.name === "Daniela")!;
@@ -101,7 +117,16 @@ describe("shouldSendNow", () => {
 });
 
 describe("weekOfLabel", () => {
-  it("anchors to Monday of the current ISO week", () => {
-    expect(weekOfLabel(NOW)).toBe("Jun 8, 2026");
+  it("anchors to Monday of the PRIOR week (the reported window)", () => {
+    // NOW = Wed Jun 10, 2026; current week starts Mon Jun 8 → prior week starts Jun 1
+    expect(weekOfLabel(NOW)).toBe("Jun 1, 2026");
+  });
+});
+
+describe("isDigestDay", () => {
+  it("is true only on Tuesday (UTC)", () => {
+    expect(isDigestDay(Date.UTC(2026, 5, 16, 15))).toBe(true); // Tue Jun 16
+    expect(isDigestDay(Date.UTC(2026, 5, 15, 15))).toBe(false); // Mon
+    expect(isDigestDay(Date.UTC(2026, 5, 17, 15))).toBe(false); // Wed
   });
 });

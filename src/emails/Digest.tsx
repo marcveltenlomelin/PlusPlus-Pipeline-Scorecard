@@ -73,7 +73,7 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
 
           {sections.funnel && (
             <>
-              <SectionTitle>Stage entries this week</SectionTitle>
+              <SectionTitle>Stage entries last week</SectionTitle>
               <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
                 {data.funnel.map((f, i) => (
                   <table key={i} width="100%" cellPadding={0} cellSpacing={0} style={{ borderBottom: i < data.funnel.length - 1 ? `1px solid ${RULE}` : "none" }}>
@@ -99,7 +99,7 @@ export default function DigestEmail({ data, appUrl, unsubscribeUrl, sections }: 
 
           {sections.sdr && data.sdrs.length > 0 && (
             <>
-              <SectionTitle>By SDR · this week</SectionTitle>
+              <SectionTitle>By SDR · last week</SectionTitle>
               <Section style={{ backgroundColor: PANEL, border: `1px solid ${RULE}`, padding: "4px 14px" }}>
                 <table width="100%" cellPadding={0} cellSpacing={0}>
                   <tbody>

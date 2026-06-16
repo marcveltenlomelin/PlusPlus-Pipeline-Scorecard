@@ -2,7 +2,7 @@ import { ARR_TARGET, CLOSE_RATE_TARGET, COVERAGE_TARGET, STAGE_LABELS } from "./
 import { fmtMoney, fmtNum, fmtPct } from "./format";
 import { headlineKpis, headlineWindows } from "./headline";
 import { enteredInPeriod, pacingBadge, pipelineCoverage, valueEnteredBetween } from "./metrics";
-import { periodKey, periodLabel, periodStart } from "./periods";
+import { periodKey, periodLabel, periodStart, shiftPeriod } from "./periods";
 import { staleDeals } from "./stale";
 import { topFocusActions } from "./todayFocus";
 import type { Deal, DigestConfig, GoalStage, StageGoal } from "./types";
@@ -31,10 +31,24 @@ export interface DigestData {
 
 const money = (n: number) => fmtMoney(n, { compact: true });
 
-/** Mon-anchored "Week of Jun 9, 2026" label for the subject. */
+/** The week the digest reports on: the PRIOR completed week. Sent Tuesday, it
+ *  covers last Mon–Sun — not the current in-progress week (which on Tuesday is
+ *  just a day or two of data). */
+export function digestWeekKey(now: number): string {
+  return shiftPeriod(periodKey(now, "week"), -1);
+}
+
+/** Mon-anchored "Week of Jun 1, 2026" label for the prior week. */
 export function weekOfLabel(now: number): string {
-  const start = periodStart(periodKey(now, "week"));
+  const start = periodStart(digestWeekKey(now));
   return start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** The digest goes out Tuesdays (UTC); the daily cron self-gates to this so it
+ *  doesn't depend on Vercel honoring a day-of-week cron expression (unreliable
+ *  on the Hobby plan). */
+export function isDigestDay(now: number): boolean {
+  return new Date(now).getUTCDay() === 2; // 0=Sun … 2=Tue
 }
 
 /** Should a cron firing at `now` send, given cadence + the last send? */
@@ -58,7 +72,7 @@ export function buildDigest(
 ): DigestData {
   const year = new Date(now).getFullYear();
   const yearStart = new Date(year, 0, 1).getTime();
-  const weekKey = periodKey(now, "week");
+  const weekKey = digestWeekKey(now); // the prior completed week — see digestWeekKey
 
   // --- Today's Focus (hero) -------------------------------------------------
   const actions = topFocusActions({ deals, goals, now, pilotTracked }, new Set());
@@ -180,7 +194,7 @@ export function buildDigest(
         ? actions[0].category === "PACING"
           ? "pacing behind goal"
           : actions[0].category.toLowerCase()
-        : `${fmtNum(enteredInPeriod(deals, "sal", weekKey).count)} new SALs this week`;
+        : `${fmtNum(enteredInPeriod(deals, "sal", weekKey).count)} new SALs last week`;
   const subject = `PlusPlus Pipeline · Week of ${weekLabel} · ${headline}`;
 
   return { subject, weekLabel, variant, focus, kpis, funnel, sdrs, stale, revenue };

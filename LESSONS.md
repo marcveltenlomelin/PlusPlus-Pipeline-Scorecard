@@ -603,3 +603,22 @@ what to do next time. Read this file before starting any new task.
 - **Tip for future-you**: `applyAnnotationOp(store, op, actor, stamp)` takes identity
   and ids/timestamps as ARGUMENTS — the route is the only place that mints them, tests
   pass fixed values, and nothing in the reducer needs mocking.
+
+### 2026-06-16 · Digest fixes — prior-week window + reliable Tuesday cron (main)
+
+- **Touched**: `digest.ts` (new `digestWeekKey` = `shiftPeriod(periodKey(now,"week"),-1)`;
+  `weekKey`, `weekOfLabel` now report the PRIOR completed week; new `isDigestDay`),
+  `Digest.tsx` ("this week" → "last week" in funnel + SDR titles), `vercel.json`
+  (cron `0 15 * * 2` → `0 15 * * *`), `cron/route.ts` (in-route `isDigestDay` gate),
+  digest tests updated to prior-week fixtures.
+- **Root causes**: (1) The digest reported `periodKey(now,"week")` — the *in-progress*
+  week, so a Tuesday send showed Mon–Tue only. Marc wanted the completed prior week.
+  (2) The weekly day-of-week cron (`* * 2`) never fired — the project is on a personal
+  **Hobby** team, where Vercel doesn't reliably honor day-of-week cron expressions.
+- **Fix pattern (reusable)**: don't trust Hobby to honor a weekly cron — schedule it
+  **daily** and gate the weekday **in the route** (`isDigestDay`, UTC Tuesday). Plan-
+  agnostic; also leaves the cadence/`lastSentAt` gate intact for biweekly/monthly.
+- **Surprise**: shifting `weekKey` broke 3 tests that placed fixtures at `NOW-1*DAY`
+  ("this week"); moving them to `NOW-7*DAY` and asserting this-week deals are EXCLUDED
+  is the better test anyway. Recipients were never lost — they persisted in the Blob
+  store the whole time (the five-person list was intact).

@@ -622,3 +622,21 @@ what to do next time. Read this file before starting any new task.
   ("this week"); moving them to `NOW-7*DAY` and asserting this-week deals are EXCLUDED
   is the better test anyway. Recipients were never lost — they persisted in the Blob
   store the whole time (the five-person list was intact).
+
+### 2026-09-15 · Onboarding an SDR (Sam) — no code, ops only
+
+- **Did**: added "Sam" to the SDR roster and sam@plusplus.co to the digest recipients in
+  the production Blob store; sent his onboarding email from Marc's Gmail. Login needed
+  nothing — auth is domain-wide for verified @plusplus.co accounts.
+- **Surprise**: `next dev` wedged at "✓ Starting…" for 7+ minutes, twice, even after
+  `rm -rf .next`. Don't fight it for a data change — `src/lib/store.ts` is pure enough
+  to drive directly: a scratch `.ts` (async `main()`, NOT top-level await — tsx runs it
+  as CJS) importing `readStore/applyPatch/writeStore`, run with `npx tsx` and
+  `BLOB_READ_WRITE_TOKEN` passed in-process (pulled via `vercel env pull
+  --environment=development` to the scratchpad, extracted, file deleted). Read-back
+  confirms the write. Faster and more deterministic than the dev server.
+- **Found in the store (not changed — surfaced to Marc)**: roster was EMPTY (Milos and
+  Marc gone since June), recipients had lost daniela@plusplus.co, and the digest's
+  Headline KPIs section was back ON. Either deliberate edits over the summer or a
+  version rollback — the roster is only the pick-list (assignments live on the deals),
+  so no attribution was lost.

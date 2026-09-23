@@ -506,7 +506,7 @@ export default function Dashboard({ userEmail, isAdmin }: DashboardProps) {
             </Section>
             <Section
               title="By SDR · Sourced Funnel"
-              subtitle="Everything each SDR has sourced and how far it got — cumulative, not period-scoped. Click a name to filter the whole page."
+              subtitle="Each SDR's sourced deals — the selected period or all time. Click a name to filter the whole page."
               delay={210}
               loading={syncing}
               skeleton="table"
@@ -519,6 +519,8 @@ export default function Dashboard({ userEmail, isAdmin }: DashboardProps) {
                 ownerOf={sdrOwnerOf}
                 selectedOwner={sdrFilter}
                 onSelectOwner={setSdrFilter}
+                period={period}
+                roster={store.sdrs}
               />
             </Section>
             <Section

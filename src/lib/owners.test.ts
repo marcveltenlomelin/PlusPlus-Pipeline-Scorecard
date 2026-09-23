@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activeOwners, ownerDisplayName, ownerRollup, sdrOwnerOf, UNASSIGNED_ID } from "./owners";
+import { periodKey, shiftPeriod } from "./periods";
 import type { Deal } from "./types";
 
 const DAY = 86_400_000;
@@ -113,5 +114,72 @@ describe("ownerRollup (cumulative sourced funnel)", () => {
     expect(rows[0].pipeValue).toBe(70_000);
     expect(rows[0].openDeals).toBe(2);
     expect(rows[1].sals).toBe(1);
+  });
+});
+
+describe("ownerRollup — timeframe scope", () => {
+  const THIS_MONTH = periodKey(NOW, "month"); // 2026-06
+  const LAST_MONTH = shiftPeriod(THIS_MONTH, -1); // 2026-05
+  const may = new Date(2026, 4, 12).getTime();
+  const jun = new Date(2026, 5, 3).getTime();
+  // Milos: one deal created + SQL'd in May, then Deep Dive in June; one fresh June SAL.
+  const deals = [
+    deal({ id: "m1", sdr: "Milos", createdAt: may, entered: { sal: may, sql: may + DAY, deepdive: jun } }),
+    deal({ id: "m2", sdr: "Milos", createdAt: jun, entered: { sal: jun } }),
+    deal({ id: "u1", createdAt: may, entered: { sal: may } }), // unassigned, May
+  ];
+
+  it("default (no opts) is the cumulative all-time rollup — guards the June fix", () => {
+    const [milos] = ownerRollup(deals, sdrOwnerOf);
+    expect(milos.owner.name).toBe("Milos");
+    expect(milos.sals).toBe(2);
+    expect(milos.sqls).toBe(1);
+    expect(milos.deepdives).toBe(1);
+    expect(milos.pipeValue).toBe(50_000);
+    expect(ownerRollup(deals, sdrOwnerOf, { scope: { kind: "all" } })).toEqual(ownerRollup(deals, sdrOwnerOf));
+  });
+
+  it("period scope counts only stage ENTRIES inside that period", () => {
+    const [june] = ownerRollup(deals, sdrOwnerOf, { scope: { kind: "period", key: THIS_MONTH } });
+    expect(june.sals).toBe(1); // m2 created in June; m1 was May
+    expect(june.sqls).toBe(0); // m1's SQL entry was May
+    expect(june.deepdives).toBe(1); // m1 entered Deep Dive in June
+    expect(june.pipeValue).toBe(0); // no SQL entries in June
+    const [mayRow] = ownerRollup(deals, sdrOwnerOf, { scope: { kind: "period", key: LAST_MONTH } });
+    expect(mayRow.sals).toBe(1);
+    expect(mayRow.sqls).toBe(1);
+    expect(mayRow.deepdives).toBe(0);
+    expect(mayRow.pipeValue).toBe(50_000);
+  });
+
+  it("openDeals is owned-right-now in every scope", () => {
+    const all = ownerRollup(deals, sdrOwnerOf)[0];
+    const june = ownerRollup(deals, sdrOwnerOf, { scope: { kind: "period", key: THIS_MONTH } })[0];
+    expect(all.openDeals).toBe(2);
+    expect(june.openDeals).toBe(2);
+  });
+
+  it("period win rate uses closes inside the period only", () => {
+    const won = deal({ id: "w", sdr: "Milos", isOpen: false, createdAt: may, entered: { sal: may, won: jun } });
+    const lostMay = deal({ id: "l", sdr: "Milos", isOpen: false, createdAt: may, entered: { sal: may, lost: may + 2 * DAY } });
+    const [june] = ownerRollup([won, lostMay], sdrOwnerOf, { scope: { kind: "period", key: THIS_MONTH } });
+    expect(june.wonLost).toEqual({ won: 1, lost: 0 });
+    expect(june.winRate).toBe(1);
+    const [all] = ownerRollup([won, lostMay], sdrOwnerOf);
+    expect(all.winRate).toBeCloseTo(0.5);
+  });
+
+  it("extraOwners (the roster) get zero rows, sorted after real activity but before Unassigned", () => {
+    const rows = ownerRollup(deals, sdrOwnerOf, {
+      scope: { kind: "period", key: THIS_MONTH },
+      extraOwners: [{ id: "Sam", name: "Sam" }],
+    });
+    expect(rows.map((r) => r.owner.name)).toEqual(["Milos", "Sam", "Unassigned"]);
+    const sam = rows[1];
+    expect(sam.sals + sam.sqls + sam.deepdives + sam.pilots + sam.won).toBe(0);
+    expect(sam.openDeals).toBe(0);
+    // an extra owner that already has deals is not duplicated
+    const dup = ownerRollup(deals, sdrOwnerOf, { extraOwners: [{ id: "Milos", name: "Milos" }] });
+    expect(dup.filter((r) => r.owner.name === "Milos")).toHaveLength(1);
   });
 });

@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { fmtMoney, fmtNum, fmtPct } from "@/lib/format";
 import { ownerRollup, UNASSIGNED_ID, type OwnerInfo, type OwnerRow } from "@/lib/owners";
+import { periodPhrase } from "@/lib/periods";
 import type { Deal } from "@/lib/types";
+import { useDash } from "./ctx";
 
 /**
  * Colored-initials avatar. The HubSpot owners API exposes no user photo URL,
@@ -47,6 +49,10 @@ interface OwnerBreakdownProps {
   /** Currently filtered owner (highlight + toggle target). */
   selectedOwner: string | null;
   onSelectOwner: (id: string | null) => void;
+  /** Selected period key from the nav — drives the "This month" scope. */
+  period: string;
+  /** SDR roster — listed even at zero so a new rep never vanishes. */
+  roster?: string[];
 }
 
 const NUM_COLS: {
@@ -68,12 +74,59 @@ function winRateCell(row: OwnerRow): string {
 
 /** Cumulative sourced-funnel per rep. Single-owner books get a leaderboard card. */
 export default function OwnerBreakdown(p: OwnerBreakdownProps) {
-  const rows = useMemo(() => ownerRollup(p.deals, p.ownerOf), [p.deals, p.ownerOf]);
+  // "period" follows the nav (week/month/quarter/year + arrows); "all" is the
+  // cumulative sourced funnel. Default period — the explicit label is what the
+  // June period-only version lacked when zeros read as broken.
+  const { now } = useDash();
+  const [scope, setScope] = useState<"period" | "all">("period");
+  const extraOwners = useMemo(
+    () => (p.roster ?? []).map((name) => ({ id: name, name })),
+    [p.roster]
+  );
+  const rows = useMemo(
+    () =>
+      ownerRollup(p.deals, p.ownerOf, {
+        scope: scope === "all" ? { kind: "all" } : { kind: "period", key: p.period },
+        extraOwners,
+      }),
+    [p.deals, p.ownerOf, scope, p.period, extraOwners]
+  );
+  const phrase = periodPhrase(p.period, now);
+  const periodLabelText = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+  const toggle = (
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <p className="text-[11px] text-ink-faint">
+        {scope === "all"
+          ? "Every stage each sourced deal has ever reached"
+          : `Stage entries in the selected period · ${periodLabelText}`}
+      </p>
+      <div role="group" aria-label="Attribution timeframe" className="flex border border-rule-dark">
+        {(["period", "all"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            aria-pressed={scope === s}
+            onClick={() => setScope(s)}
+            title={
+              s === "all"
+                ? "Cumulative: every stage each sourced deal has ever reached"
+                : "What each SDR did in the selected period — use the nav toggle and arrows to move"
+            }
+            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
+              scope === s ? "bg-ink text-paper" : "text-ink-soft hover:bg-paper"
+            }`}
+          >
+            {s === "all" ? "All time" : periodLabelText}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   // Solo book: one card with tiles instead of a one-row table.
-  if (rows.length === 1) {
-    const r = rows[0];
-    return (
+  const r = rows[0];
+  const content =
+    rows.length === 1 ? (
       <div className="border border-rule bg-panel p-5 shadow-card">
         <div className="flex items-center gap-2.5">
           <Avatar name={r.owner.name} />
@@ -96,10 +149,7 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
           </div>
         </div>
       </div>
-    );
-  }
-
-  return (
+    ) : (
     <div className="overflow-x-auto border border-rule bg-panel shadow-card">
       <table className="w-full min-w-[48rem] text-sm">
         <thead>
@@ -150,6 +200,13 @@ export default function OwnerBreakdown(p: OwnerBreakdownProps) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+
+  return (
+    <div>
+      {toggle}
+      {content}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { enteredInPeriod } from "./metrics";
 import type { Deal, StageKey } from "./types";
 
 /**
@@ -60,32 +61,56 @@ export interface OwnerRow {
   owner: OwnerInfo;
   /** Currently-open deals attributed to this owner — "how many they own" right now. */
   openDeals: number;
-  /** Sourced deals that have EVER reached each stage — cumulative attribution. */
+  /** Sourced deals reaching each stage — ever (all-time) or within the period scope. */
   sals: number;
   sqls: number;
   deepdives: number;
   pilots: number;
   won: number;
-  /** Total value of sourced deals that ever entered SQL — pipeline $ sourced. */
+  /** Value of sourced deals entering SQL — ever, or within the period scope. */
   pipeValue: number;
-  /** All-time win rate over the sourced cohort; null when nothing closed. */
+  /** Win rate over closes in scope; null when nothing closed. */
   winRate: number | null;
   wonLost: { won: number; lost: number };
 }
 
+export type RollupScope = { kind: "all" } | { kind: "period"; key: string };
+
+export interface RollupOptions {
+  /** "all" (default) = every stage a sourced deal has EVER reached; "period" =
+   *  stage entries inside that week/month/quarter/year key. */
+  scope?: RollupScope;
+  /** Owners to list even with zero deals (the SDR roster) — a new rep shows a
+   *  zero row instead of vanishing until their first deal. */
+  extraOwners?: OwnerInfo[];
+}
+
 /**
- * Per-owner CUMULATIVE funnel: a sourced deal that reached Pilot counts one
- * SQL, one Deep Dive, and one Pilot, whenever those entries happened. The
- * period toggle deliberately does not scope this — crediting an SDR only for
- * stages entered "this month" zeroes their history and reads as broken
- * (confirmed with live data: Motive/Hanna, sourced by Milos, entered
- * SQL/Deep Dive in April and Pilot in May). Sorted by pipe $ sourced desc.
+ * Per-owner funnel in one of two scopes.
+ *  - all-time: a sourced deal that reached Pilot counts one SQL, one Deep Dive
+ *    and one Pilot whenever those entries happened — "how far did each sourced
+ *    deal get" (the June default; period-only zeroed history and read as broken).
+ *  - period: stage ENTRIES inside the selected key — "what did each SDR do this
+ *    week/month" (the same math the Tuesday digest uses weekly).
+ * openDeals is owned-right-now in both scopes — it isn't a flow metric.
+ * Sorted pipe $ desc → SALs desc → name; Unassigned sits last regardless of size.
  */
-export function ownerRollup(deals: Deal[], ownerOf?: (deal: Deal) => OwnerInfo): OwnerRow[] {
+export function ownerRollup(
+  deals: Deal[],
+  ownerOf?: (deal: Deal) => OwnerInfo,
+  opts: RollupOptions = {}
+): OwnerRow[] {
   const of = ownerOf ?? hubspotOwnerOf;
-  const reached = (mine: Deal[], stage: StageKey) =>
-    mine.filter((d) => d.entered[stage] !== undefined);
-  return activeOwners(deals, of)
+  const scope: RollupScope = opts.scope ?? { kind: "all" };
+  const reached = (mine: Deal[], stage: StageKey): Deal[] =>
+    scope.kind === "all"
+      ? mine.filter((d) => d.entered[stage] !== undefined)
+      : enteredInPeriod(mine, stage, scope.key).deals;
+  const owners = [...activeOwners(deals, of)];
+  for (const extra of opts.extraOwners ?? []) {
+    if (!owners.some((o) => o.id === extra.id)) owners.push(extra);
+  }
+  return owners
     .map((owner) => {
       const mine = deals.filter((d) => of(d).id === owner.id);
       const won = reached(mine, "won").length;
@@ -93,7 +118,7 @@ export function ownerRollup(deals: Deal[], ownerOf?: (deal: Deal) => OwnerInfo):
       return {
         owner,
         openDeals: mine.filter((d) => d.isOpen).length,
-        sals: mine.length, // entered.sal is always set (createdate = SAL signal)
+        sals: reached(mine, "sal").length, // entered.sal is always set (createdate = SAL signal)
         sqls: reached(mine, "sql").length,
         deepdives: reached(mine, "deepdive").length,
         pilots: reached(mine, "pilot").length,
@@ -107,6 +132,6 @@ export function ownerRollup(deals: Deal[], ownerOf?: (deal: Deal) => OwnerInfo):
       // real people lead; the historical Unassigned bucket sits last regardless of size
       if (a.owner.id === UNASSIGNED_ID) return 1;
       if (b.owner.id === UNASSIGNED_ID) return -1;
-      return b.pipeValue - a.pipeValue;
+      return b.pipeValue - a.pipeValue || b.sals - a.sals || a.owner.name.localeCompare(b.owner.name);
     });
 }

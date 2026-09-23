@@ -640,3 +640,28 @@ what to do next time. Read this file before starting any new task.
   Headline KPIs section was back ON. Either deliberate edits over the summer or a
   version rollback — the roster is only the pick-list (assignments live on the deals),
   so no attribution was lost.
+
+### 2026-09-23 · By SDR timeframe scope — period vs all-time (main)
+
+- **Touched**: `owners.ts` (`ownerRollup(deals, ownerOf?, opts?)` — `scope: {kind:"all"} |
+  {kind:"period", key}` reusing `enteredInPeriod`, plus `extraOwners` so roster names get
+  a zero row; default = the June cumulative behavior, guarded by a byte-equality test),
+  `OwnerBreakdown.tsx` (segmented "This month | All time" toggle mirroring Revenue's
+  Raw/Weighted control, scope caption, `period`/`roster` props), `Dashboard.tsx` (passes
+  `period` + `store.sdrs`), 5 new tests (70 total).
+- **Decision**: default scope = the nav period (consistent with every other section); the
+  explicit toggle label is exactly what June's period-only version lacked when zeros read
+  as broken. `openDeals` stays owned-right-now in both scopes — not a flow metric.
+- **Surprises**: (1) The machine was at load 50–118 (Chrome/Zoom/Granola); `tsc` took 5s
+  CPU across 5 minutes and `next dev` needed ~10 min to boot and ~4 min to compile `/`.
+  Zombie `tsc`/`next dev` processes made it worse — `pkill -f "tsc --noEmit"; pkill -f
+  "next dev"` first. Don't restart a slow `next dev`; each restart loses the compile.
+  (2) The Playwright MCP's `browser_navigate` and `run_code_unsafe` drove DIFFERENT tabs —
+  navigate's page detached (ERR_ABORTED) and code ran on `about:blank`. Under load, put
+  navigation + asserts + screenshots in ONE `run_code_unsafe` script with long timeouts
+  and `page.screenshot({ path: <absolute tests/visual path> })`. (3) Warm `/` with a
+  long-timeout curl before Playwright; the client bundle's cold compile exceeds any
+  browser navigation timeout on a loaded machine.
+- **Tip for future-you**: the middleware still logs `MissingSecret` on every local request
+  (only page.tsx and the annotations route are guarded) — cosmetic in tokenless dev, but
+  guard it the same way if the noise ever matters.
